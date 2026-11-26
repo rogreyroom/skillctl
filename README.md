@@ -11,6 +11,8 @@
 
 Works across **VS Code (Copilot)**, **Cursor**, **Raycast**, **Antigravity**, and **T3 Code (Codex + Claude Code)**.
 
+[Website & Docs](https://rogreyroom.github.io/skillctl/)
+
 </div>
 
 ---

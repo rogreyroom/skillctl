@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>skillctl — Central AI Agent Skill Manager</title>
+  <meta
+    name="description"
+    content="Manage global, per-project, and Raycast AI agent skills from one central dotfiles library. Works across VS Code, Cursor, Antigravity, T3 Code (Codex + Claude Code), and Raycast."
+  />
+  <meta property="og:title" content="skillctl — Central AI Agent Skill Manager" />
+  <meta
+    property="og:description"
+    content="One dotfiles library. Lean global skills. Auto-detected per-project symlinks or team copies. Plus Raycast bridge and Antigravity global sync."
+  />
+  <meta property="og:type" content="website" />
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23ff5500'/%3E%3Cpath d='M16 6L26 16L16 26L6 16Z' fill='%23111111'/%3E%3C/svg%3E"
+  />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    html, body { margin: 0; padding: 0; }
+
+    :root {
+      --bg: #111111;
+      --surface: #181818;
+      --surface-2: #0c0c0c;
+      --ink: #ece6d8;
+      --muted: #8f8a80;
+      --orange: #ff5500;
+      --orange-soft: rgba(255, 85, 0, 0.14);
+      --line: rgba(236, 230, 216, 0.14);
+      --line-strong: rgba(236, 230, 216, 0.28);
+      --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      --sans: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    body {
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      background-color: var(--bg);
+      color: var(--ink);
+      background-image: radial-gradient(rgba(255, 255, 255, 0.032) 1px, transparent 0);
+      background-size: 20px 20px;
+    }
+
+    @keyframes enterUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .anim-enter { animation: enterUp 240ms var(--ease-out) both; }
+    .anim-d1 { animation-delay: 45ms; }
+    .anim-d2 { animation-delay: 90ms; }
+    .anim-d3 { animation-delay: 135ms; }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .anim-enter { animation: none !important; }
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
+    }
+
+    code { font-family: var(--mono); }
+    button { font-family: inherit; }
+
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 24px 80px; }
+
+    /* Topbar */
+    .topbar {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 24px;
+      padding: 14px 18px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      background: var(--orange);
+      color: #111;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      flex-wrap: wrap;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 140ms var(--ease-out);
+    }
+    .nav-links a:hover { color: var(--orange); }
+    .nav-links .status-pill { color: var(--muted); margin-left: auto; }
+    .nav-links .status-pill b { color: var(--orange); font-weight: 500; }
+
+    .cta {
+      border: 1px solid var(--orange);
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(255, 85, 0, 0.16),
+        rgba(255, 85, 0, 0.16) 4px,
+        rgba(255, 85, 0, 0.06) 4px,
+        rgba(255, 85, 0, 0.06) 8px
+      );
+      color: var(--orange);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 10px 16px;
+      text-decoration: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 120ms var(--ease-out);
+    }
+    .cta:hover { background: var(--orange); color: #111; }
+    .cta:active { transform: scale(0.97); }
+    .cta:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+    .btn-ghost {
+      border: 1px solid var(--line-strong);
+      background: transparent;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 10px 14px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: border-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 120ms var(--ease-out);
+    }
+    .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
+    .btn-ghost:active { transform: scale(0.97); }
+    .btn-ghost:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+    /* Agent Ticker */
+    .ticker {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 12px 18px;
+      border-left: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px dashed rgba(255, 85, 0, 0.48);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #bdb7aa;
+    }
+    .ticker .sep { color: rgba(255, 85, 0, 0.55); }
+
+    /* Hero */
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 1.12fr;
+      gap: 36px;
+      padding: 48px 0 40px;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 {
+      margin: 0 0 18px;
+      font-size: clamp(40px, 5.4vw, 66px);
+      line-height: 0.96;
+      letter-spacing: -0.04em;
+    }
+    .rule { height: 6px; background: var(--orange); width: 100%; margin: 20px 0; }
+    .hero-copy {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #bdb7aa;
+      margin: 0;
+    }
+    .hero-copy code {
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      padding: 1px 6px;
+      font-size: 13px;
+    }
+    .ascii-box {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.75;
+      border-top: 1px dashed var(--line);
+      border-bottom: 1px dashed var(--line);
+      padding: 14px 0;
+      margin: 22px 0;
+    }
+    .ascii-box b { color: var(--orange); font-weight: 500; }
+    .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .hatch {
+      height: 32px;
+      margin-top: 24px;
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(236, 230, 216, 0.11),
+        rgba(236, 230, 216, 0.11) 6px,
+        transparent 6px,
+        transparent 14px
+      );
+    }
+
+    /* Interactive Console */
+    .console {
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .console::before, .console::after {
+      content: "";
+      position: absolute;
+      width: 11px;
+      height: 11px;
+      border-color: var(--orange);
+      border-style: solid;
+      pointer-events: none;
+    }
+    .console::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+    .console::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+    .console-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+    }
+    .cmd-tab {
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 11px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 140ms var(--ease-out), background-color 140ms var(--ease-out);
+    }
+    .cmd-tab:hover { color: var(--ink); }
+    .cmd-tab[data-active] { color: #111; background: var(--orange); font-weight: 600; }
+    .console-body {
+      padding: 20px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.65;
+      flex: 1;
+      min-height: 300px;
+      white-space: pre-wrap;
+      color: #dcd6ca;
+      overflow-x: auto;
+    }
+    .console-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--line);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .copy-sm {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 5px 10px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      transition: border-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 110ms var(--ease-out);
+    }
+    .copy-sm:hover { border-color: var(--orange); color: var(--orange); }
+    .copy-sm:active { transform: scale(0.97); }
+
+    /* Section Header */
+    .section { padding: 48px 0; border-bottom: 1px solid var(--line); }
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .section-head h2 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 32px);
+      letter-spacing: -0.03em;
+    }
+    .section-kicker {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--orange);
+    }
+
+    /* Feature Grid */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      padding: 22px;
+      position: relative;
+      transition: border-color 150ms var(--ease-out);
+    }
+    .card:hover { border-color: rgba(255, 85, 0, 0.45); }
+    .card-num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--orange);
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 18px; letter-spacing: -0.02em; }
+    .card p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
+    .card code { color: #d9d3c6; font-size: 12.5px; }
+
+    /* Quickstart Steps */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .step {
+      padding: 20px;
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .step:last-child { border-right: 0; }
+    .step-code {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      color: var(--ink);
+    }
+    .step p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+
+    /* Command Reference Table */
+    .cmd-filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .search-input {
+      background: var(--surface-2);
+      border: 1px solid var(--line-strong);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 10px 14px;
+      width: 320px;
+      max-width: 100%;
+    }
+    .search-input:focus { outline: 2px solid var(--orange); outline-offset: -1px; }
+
+    .cmd-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      font-size: 14px;
+    }
+    .cmd-table th {
+      text-align: left;
+      padding: 12px 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--orange);
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+    .cmd-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .cmd-table tr:last-child td { border-bottom: 0; }
+    .cmd-table td:first-child {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    .cmd-table td:last-child { color: var(--muted); line-height: 1.5; }
+
+    /* Platforms */
+    .platforms {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .plat { padding: 22px; border-right: 1px solid var(--line); }
+    .plat:last-child { border-right: 0; }
+    .plat h3 {
+      margin: 0 0 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--orange);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .plat p { margin: 0 0 12px; font-size: 14px; color: var(--muted); line-height: 1.55; }
+    .plat pre {
+      margin: 0;
+      padding: 10px 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      font-family: var(--mono);
+      font-size: 12px;
+      color: #d9d3c6;
+      overflow-x: auto;
+    }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-top: 28px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .footer a { color: var(--ink); text-decoration: none; }
+    .footer a:hover { color: var(--orange); }
+
+    @media (max-width: 900px) {
+      .topbar { grid-template-columns: 1fr; }
+      .nav-links .status-pill { margin-left: 0; }
+      .hero, .grid-3, .steps, .platforms { grid-template-columns: 1fr; }
+      .step, .plat { border-right: 0; border-bottom: 1px solid var(--line); }
+      .step:last-child, .plat:last-child { border-bottom: 0; }
+      .cmd-table td:first-child { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar anim-enter">
+      <a class="logo" href="#">
+        <span class="logo-mark">◆</span>
+        <span>SKILLCTL</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#features">Capabilities</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#commands">Commands</a>
+        <a href="#platforms">Environments</a>
+        <span class="status-pill">STATUS: <b>MISSION READY</b> · v0.2.0</span>
+      </nav>
+      <a class="cta" href="https://github.com/rogreyroom/skillctl" target="_blank" rel="noreferrer">
+        GITHUB ↗
+      </a>
+    </header>
+
+    <div class="ticker anim-enter anim-d1" aria-label="Supported AI coding agents">
+      <span>VS CODE (COPILOT)</span><span class="sep">·</span>
+      <span>CURSOR</span><span class="sep">·</span>
+      <span>ANTIGRAVITY</span><span class="sep">·</span>
+      <span>T3 CODE</span><span class="sep">·</span>
+      <span>CODEX</span><span class="sep">·</span>
+      <span>CLAUDE CODE</span><span class="sep">·</span>
+      <span>RAYCAST</span>
+    </div>
+
+    <main>
+      <section class="hero anim-enter anim-d2">
+        <div>
+          <h1>Deploy the right<br />skills to every<br />repo.</h1>
+          <div class="rule"></div>
+          <p class="hero-copy">
+            Centralize your <code>SKILL.md</code> library in dotfiles. Keep global skills lean,
+            auto-suggest project skills from your stack, mix personal git-excluded symlinks with
+            committed team copies, and switch Raycast context in one command.
+          </p>
+          <div class="ascii-box">
+***  SKILLCTL // CENTRAL SKILL OPERATIONS — <b>v0.2.0</b>       ***<br />
+***  TARGETS:  .agents/ · .claude/ · .gemini/ · raycast  ***<br />
+***  SECURITY: PATH-SAFE · NO SYMLINK LEAKS · <b>0 VULNS</b>    ***
+          </div>
+          <div class="hero-actions">
+            <button
+              class="cta"
+              data-copy="git clone https://github.com/rogreyroom/skillctl.git && cd skillctl && pnpm install && pnpm build && npm link"
+            >
+              COPY INSTALL COMMAND
+            </button>
+            <a class="btn-ghost" href="#quickstart">QUICKSTART ↓</a>
+            <button class="btn-ghost" data-copy='eval "$(skillctl completion zsh)"'>
+              ZSH COMPLETION
+            </button>
+          </div>
+          <div class="hatch" aria-hidden="true"></div>
+        </div>
+
+        <div class="console" aria-label="Interactive CLI output preview">
+          <div class="console-tabs" role="tablist">
+            <button class="cmd-tab" role="tab" data-demo="status" data-active>status</button>
+            <button class="cmd-tab" role="tab" data-demo="init">init</button>
+            <button class="cmd-tab" role="tab" data-demo="list">list -p</button>
+            <button class="cmd-tab" role="tab" data-demo="doctor">doctor --fix</button>
+            <button class="cmd-tab" role="tab" data-demo="raycast">raycast use</button>
+          </div>
+          <div class="console-body" id="console-out"></div>
+          <div class="console-foot">
+            <span id="console-cmd">$ skillctl status</span>
+            <button class="copy-sm" id="console-copy" data-copy="skillctl status">COPY CMD</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section anim-enter anim-d3">
+        <div class="section-head">
+          <h2>Built for multi-agent workflows</h2>
+          <span class="section-kicker">01 // CAPABILITIES</span>
+        </div>
+        <div class="grid-3">
+          <article class="card">
+            <div class="card-num">01 // AUTO-DETECT</div>
+            <h3>Reads your project stack</h3>
+            <p>
+              Parses <code>package.json</code>, <code>composer.json</code>, <code>pyproject.toml</code>,
+              <code>Cargo.toml</code>, and config globs like <code>nuxt.config.*</code> against
+              <code>index.yaml</code> without touching <code>SKILL.md</code>.
+            </p>
+          </article>
+          <article class="card">
+            <div class="card-num">02 // DUAL MANIFEST</div>
+            <h3>Personal + Team in one repo</h3>
+            <p>
+              Commit shared <code>--copy</code> skills in <code>.skillctl.json</code> while keeping personal
+              <code>--link</code> skills in <code>.skillctl.local.json</code> — auto-hidden via
+              <code>.git/info/exclude</code>.
+            </p>
+          </article>
+          <article class="card">
+            <div class="card-num">03 // RAYCAST BRIDGE</div>
+            <h3>Project skills inside Raycast</h3>
+            <p>
+              Uses <code>~/.config/raycast/skills</code> exclusively for Raycast so you can switch active
+              projects or pin extras without duplicating skills in Cursor or VS Code.
+            </p>
+          </article>
+          <article class="card">
+            <div class="card-num">04 // CAPTURE</div>
+            <h3>Save unknown repo skills</h3>
+            <p>
+              During <code>skillctl init</code>, discovers unmanaged skills in <code>.agents/</code>,
+              <code>.claude/</code>, and <code>.cursor/</code> so you can import them into your library and
+              choose whether they stay in the repo.
+            </p>
+          </article>
+          <article class="card">
+            <div class="card-num">05 // WORKTREES &amp; GROUPS</div>
+            <h3>Built for daily speed</h3>
+            <p>
+              Bundle skills into <code>@nuxt</code> or <code>@ui</code> groups with <code>skillctl group</code>,
+              auto-inherit local manifests in fresh git worktrees, and tab-complete in zsh, bash, or fish.
+            </p>
+          </article>
+          <article class="card">
+            <div class="card-num">06 // HARDENED</div>
+            <h3>Doctor &amp; security checks</h3>
+            <p>
+              Validates Raycast kebab-case rules, detects copy drift via SHA-256 hash, cleans legacy
+              <code>~/.cursor/skills</code> duplicates, blocks path traversal, and strips untrusted symlinks.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="quickstart" class="section">
+        <div class="section-head">
+          <h2>Quickstart in four commands</h2>
+          <span class="section-kicker">02 // DEPLOYMENT</span>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="card-num">STEP 01</div>
+            <div class="step-code">
+              <code>skillctl setup</code>
+              <button class="copy-sm" data-copy="skillctl setup">COPY</button>
+            </div>
+            <p>Configure your dotfiles library path, enable Antigravity / Claude Code targets, and migrate existing skills.</p>
+          </div>
+          <div class="step">
+            <div class="card-num">STEP 02</div>
+            <div class="step-code">
+              <code>skillctl global add</code>
+              <button class="copy-sm" data-copy="skillctl global add">COPY</button>
+            </div>
+            <p>Pick your minimal always-on skills (e.g. <code>find-skills</code>, <code>grill-me</code>) linked globally.</p>
+          </div>
+          <div class="step">
+            <div class="card-num">STEP 03</div>
+            <div class="step-code">
+              <code>skillctl init</code>
+              <button class="copy-sm" data-copy="skillctl init">COPY</button>
+            </div>
+            <p>Run inside any project to detect stack matches, capture local skills, and sync personal or team copies.</p>
+          </div>
+          <div class="step">
+            <div class="card-num">STEP 04</div>
+            <div class="step-code">
+              <code>skillctl doctor --fix</code>
+              <button class="copy-sm" data-copy="skillctl doctor --fix">COPY</button>
+            </div>
+            <p>Verify frontmatter, repair broken links, clean legacy duplicates, and update drifted team copies.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="commands" class="section">
+        <div class="section-head">
+          <h2>Command Reference</h2>
+          <span class="section-kicker">03 // CLI SURFACE</span>
+        </div>
+        <div class="cmd-filter-bar">
+          <input
+            id="cmd-filter"
+            class="search-input"
+            type="search"
+            placeholder="Filter commands (e.g. raycast, group, doctor)..."
+            aria-label="Filter CLI commands"
+          />
+          <span class="section-kicker" id="cmd-count">15 COMMANDS</span>
+        </div>
+        <table class="cmd-table">
+          <thead>
+            <tr>
+              <th>Command</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody id="cmd-tbody"></tbody>
+        </table>
+      </section>
+
+      <section id="platforms" class="section">
+        <div class="section-head">
+          <h2>Cross-Platform Environments</h2>
+          <span class="section-kicker">04 // NODE 20+</span>
+        </div>
+        <div class="platforms">
+          <div class="plat">
+            <h3>MACOS</h3>
+            <p>Full support for VS Code, Cursor, Antigravity, T3 Code (Codex + Claude Code), and the Raycast bridge.</p>
+            <pre>eval "$(skillctl completion zsh)"</pre>
+          </div>
+          <div class="plat">
+            <h3>LINUX</h3>
+            <p>Native symlinks across <code>~/.agents/skills</code>, <code>~/.gemini/config/skills</code>, and <code>~/.claude/skills</code>.</p>
+            <pre>eval "$(skillctl completion bash)"</pre>
+          </div>
+          <div class="plat">
+            <h3>WINDOWS (WSL)</h3>
+            <p>Works out of the box in the WSL Linux filesystem (<code>~/projects</code>). Use <code>--copy</code> on <code>/mnt/c</code> if Developer Mode is off.</p>
+            <pre>skillctl setup --yes &amp;&amp; skillctl global sync</pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>◆ SKILLCTL · MIT LICENSE</span>
+      <span>
+        <a href="https://github.com/rogreyroom/skillctl" target="_blank" rel="noreferrer">GITHUB</a>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/rogreyroom/skillctl/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">CHANGELOG</a>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/rogreyroom/skillctl/issues" target="_blank" rel="noreferrer">ISSUES</a>
+      </span>
+    </footer>
+  </div>
+
+  <script>
+    const CONSOLE_DEMOS = {
+      status: {
+        cmd: "skillctl status",
+        out: `╭─ skillctl status ──────────────────────────────────────────╮
+│ Library         ~/dotfiles/agent-skills (23 skills)        │
+│ Targets         ~/.agents/skills, ~/.gemini/config/skills  │
+│ Global          find-skills, grill-me, planning-assistant  │
+│ Project         farm24-app (/Users/robert/farm24-app)      │
+│ Project skills  2 repo · 4 local · 0 unmanaged             │
+│ Raycast         active: farm24-app · pinned: 1             │
+╰────────────────────────────────────────────────────────────╯`
+      },
+      init: {
+        cmd: "skillctl init",
+        out: `◆ skillctl init — farm24-app
+│
+├─ Detected matching skills:
+│  • vitest               (dep "vitest")
+│  • nuxt-api-development (dep "nuxt", file "nuxt.config.ts")
+│  • drizzle-migration    (dep "drizzle-orm")
+│
+├─ Storage mode: Mixed (repo → .skillctl.json, personal → .skillctl.local.json)
+├─ Excluded personal links in .git/info/exclude
+└─ ✓ Synced project skills (2 personal linked, 1 repo copied)`
+      },
+      list: {
+        cmd: "skillctl list --project",
+        out: `◆ Project: farm24-app /Users/robert/farm24-app
+  • drizzle-migration-review  repo:copy   Checklist for Drizzle + SQLite…
+  • nuxt-api-development      local:link  Build Nuxt server API handlers…
+  • vitest                    local:link  Vitest fast unit testing…
+
+◆ Global skills also active in this project
+  • find-skills               global      Helps users discover and install…
+  • grill-me                  global      Interview the user relentlessly…`
+      },
+      doctor: {
+        cmd: "skillctl doctor --fix",
+        out: `◆ skillctl doctor /Users/robert/farm24-app
+  FIXED  [global]  Legacy skill "nuxt-code-review" in ~/.cursor/skills/
+  FIXED  [project] Copied skill "drizzle-migration" drifted (synced to library)
+  FIXED  [raycast] Removed duplicate "find-skills" (already global)
+
+  ✓ Doctor finished: 3 fixed, 0 remaining.`
+      },
+      raycast: {
+        cmd: "skillctl raycast use",
+        out: `✓ Raycast active project set to farm24-app
+  Linked in ~/.config/raycast/skills:
+    • drizzle-migration-review
+    • nuxt-api-development
+    • vitest
+  Skipped (already global): find-skills, grill-me`
+      }
+    };
+
+    const COMMANDS = [
+      ["skillctl setup", "Configure library path, toggle Antigravity & Claude Code targets, and migrate existing skills."],
+      ["skillctl status", "Show library path, enabled global targets, project skill counts, worktree state, and Raycast bridge."],
+      ["skillctl init", "Detect project stack, capture unknown local skills, and sync personal, shared, or mixed skills."],
+      ["skillctl add [skills...|@group]", "Add skills or @group bundles to current project (--link personal / --copy shared)."],
+      ["skillctl rm [skills...|@group]", "Remove skills or @group bundles from current project."],
+      ["skillctl sync [--all]", "Rebuild symlinks/copies (inherits .skillctl.local.json in fresh git worktrees; --all syncs all tracked projects)."],
+      ["skillctl list [-p|--project]", "List library skills with status badges, or pass -p to verify only skills active in this project."],
+      ["skillctl new <name>", "Scaffold a new kebab-case skill with Raycast-valid SKILL.md frontmatter and optional match rules."],
+      ["skillctl edit [skill]", "Open a skill's SKILL.md in $EDITOR and validate frontmatter immediately on close."],
+      ["skillctl search <query>", "Search library skills by keyword, description, @group, or match rules."],
+      ["skillctl info <skill>", "Inspect full metadata, upstream source, match rules, and tracked project usage."],
+      ["skillctl group list|add|rm", "Create and manage @group bundles in index.yaml."],
+      ["skillctl global list|add|rm|sync", "Manage global skills in ~/.agents/skills (+ ~/.gemini/config/skills & ~/.claude/skills if enabled)."],
+      ["skillctl raycast use|clear|add|rm|status", "Switch active project or pin skills in ~/.config/raycast/skills (macOS)."],
+      ["skillctl install / update / migrate", "Import from GitHub (owner/repo) or local folders, re-pull upstream updates, or migrate legacy folders."],
+      ["skillctl doctor [--fix]", "Check and auto-fix broken symlinks, duplicates, legacy ~/.cursor copies, invalid SKILL.md, and copy drift."],
+      ["skillctl completion <zsh|bash|fish>", "Print dynamic shell autocompletion script for subcommands, live skills, and @groups."]
+    ];
+
+    // Copy buttons
+    document.querySelectorAll("[data-copy]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const text = btn.getAttribute("data-copy");
+        navigator.clipboard?.writeText(text).catch(() => {});
+        const prev = btn.textContent;
+        btn.textContent = "COPIED ✓";
+        setTimeout(() => { btn.textContent = prev; }, 1500);
+      });
+    });
+
+    // Interactive console tabs
+    const outEl = document.getElementById("console-out");
+    const cmdEl = document.getElementById("console-cmd");
+    const copyEl = document.getElementById("console-copy");
+    const tabs = [...document.querySelectorAll(".cmd-tab")];
+
+    function showDemo(key) {
+      const d = CONSOLE_DEMOS[key];
+      tabs.forEach((t) => {
+        const active = t.dataset.demo === key;
+        t.toggleAttribute("data-active", active);
+        t.setAttribute("aria-selected", String(active));
+      });
+      outEl.textContent = d.out;
+      cmdEl.textContent = "$ " + d.cmd;
+      copyEl.setAttribute("data-copy", d.cmd);
+    }
+    tabs.forEach((t) => t.addEventListener("click", () => showDemo(t.dataset.demo)));
+    showDemo("status");
+
+    // Searchable command table
+    const tbody = document.getElementById("cmd-tbody");
+    const filterInput = document.getElementById("cmd-filter");
+    const countEl = document.getElementById("cmd-count");
+
+    function renderCommands(q = "") {
+      const needle = q.trim().toLowerCase();
+      const filtered = COMMANDS.filter(
+        ([cmd, desc]) =>
+          !needle ||
+          cmd.toLowerCase().includes(needle) ||
+          desc.toLowerCase().includes(needle)
+      );
+      countEl.textContent = `${filtered.length} COMMAND${filtered.length === 1 ? "" : "S"}`;
+      tbody.innerHTML = filtered
+        .map(([cmd, desc]) => `<tr><td>${cmd}</td><td>${desc}</td></tr>`)
+        .join("");
+    }
+    filterInput.addEventListener("input", (e) => renderCommands(e.target.value));
+    renderCommands();
+  </script>
+</body>
+</html>
