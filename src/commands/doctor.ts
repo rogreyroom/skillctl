@@ -2,6 +2,7 @@ import path from "node:path";
 import pc from "picocolors";
 import { loadConfig } from "../config.js";
 import { runDoctor } from "../doctor.js";
+import { badge, icons, sectionHeader } from "../ui.js";
 
 export async function runDoctorCommand(options: {
   fix?: boolean;
@@ -11,8 +12,12 @@ export async function runDoctorCommand(options: {
   const config = await loadConfig();
   const issues = await runDoctor(config, projectDir);
 
+  console.log(sectionHeader("skillctl doctor", projectDir));
+
   if (issues.length === 0) {
-    console.log(pc.green("✓ No issues found. Everything looks healthy!"));
+    console.log(
+      `  ${icons.ok} ${pc.green("No issues found. Everything looks healthy!")}\n`,
+    );
     return;
   }
 
@@ -24,36 +29,36 @@ export async function runDoctorCommand(options: {
     if (issue.severity === "error") errorCount++;
     else warnCount++;
 
-    const tag =
-      issue.severity === "error"
-        ? pc.red("ERROR")
-        : pc.yellow("WARN ");
-    const scope = pc.dim(`[${issue.scope}]`);
+    const scopeTag = pc.dim(`[${issue.scope}]`);
 
     if (options.fix && issue.fixable && issue.fix) {
       await issue.fix();
       fixedCount++;
-      console.log(`${pc.green("FIXED")} ${scope} ${issue.message}`);
+      console.log(
+        `  ${badge("FIXED", "green")} ${scopeTag} ${issue.message}`,
+      );
     } else {
+      const icon = issue.severity === "error" ? icons.err : icons.warn;
       const hint = issue.fixable ? pc.dim(" (fixable with --fix)") : "";
-      console.log(`${tag} ${scope} ${issue.message}${hint}`);
+      console.log(`  ${icon} ${scopeTag} ${issue.message}${hint}`);
     }
   }
 
   console.log("");
   if (options.fix) {
+    const remaining = issues.length - fixedCount;
     console.log(
-      pc.cyan(
-        `Doctor finished: ${fixedCount} fixed, ${issues.length - fixedCount} remaining.`,
-      ),
+      `  ${icons.ok} ${pc.cyan(`Doctor finished: ${fixedCount} fixed, ${remaining} remaining.`)}\n`,
     );
   } else {
-    console.log(
-      `Found ${pc.red(`${errorCount} error(s)`)} and ${pc.yellow(`${warnCount} warning(s)`)}.` +
-        (issues.some((i) => i.fixable)
-          ? ` Run ${pc.cyan("skillctl doctor --fix")} to auto-repair fixable issues.`
-          : ""),
-    );
+    const summary = [
+      errorCount > 0 ? pc.red(`${errorCount} error(s)`) : pc.dim("0 errors"),
+      warnCount > 0 ? pc.yellow(`${warnCount} warning(s)`) : pc.dim("0 warnings"),
+    ].join(pc.dim(" · "));
+    const fixHint = issues.some((i) => i.fixable)
+      ? `  Run ${pc.cyan("skillctl doctor --fix")} to auto-repair.`
+      : "";
+    console.log(`  ${summary}${fixHint}\n`);
     if (errorCount > 0) {
       process.exitCode = 1;
     }

@@ -24,6 +24,7 @@ import {
   getProjectLocalManifestPath,
   getProjectManifestPath,
 } from "../paths.js";
+import { badge, icons, sectionHeader } from "../ui.js";
 
 export async function runGlobalListCommand(): Promise<void> {
   const config = await loadConfig();
@@ -34,17 +35,19 @@ export async function runGlobalListCommand(): Promise<void> {
   if (config.agents.antigravity) targets.push("~/.gemini/config/skills");
 
   console.log(
-    pc.bold(
-      `Global skills (${index.global.length}) ${pc.dim(`[${targets.join(" + ")}]`)}:`,
+    sectionHeader(
+      `Global skills (${index.global.length})`,
+      targets.join(" + "),
     ),
   );
   if (index.global.length === 0) {
-    console.log(pc.dim("  (none)"));
+    console.log(pc.dim("  (none)\n"));
     return;
   }
   for (const name of index.global) {
-    console.log(`  • ${pc.cyan(name)}`);
+    console.log(`  ${icons.bullet} ${pc.bold(name)} ${badge("global", "cyan")}`);
   }
+  console.log("");
 }
 
 export async function runGlobalAddCommand(

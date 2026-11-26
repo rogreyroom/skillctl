@@ -12,6 +12,7 @@ import {
 } from "../library.js";
 import { syncRaycast } from "../linker.js";
 import { getRaycastSkillsDir } from "../paths.js";
+import { renderCard } from "../ui.js";
 
 export async function runRaycastUseCommand(
   projectArg?: string,
@@ -145,14 +146,29 @@ export async function runRaycastStatusCommand(): Promise<void> {
   const config = await loadConfig();
   const index = await loadLibraryIndex(config.libraryPath);
 
-  console.log(pc.bold("Raycast bridge (~/.config/raycast/skills)"));
-  console.log(
-    `  Active project: ${config.raycast.activeProject ? pc.cyan(config.raycast.activeProject) : pc.dim("(none)")}`,
-  );
-  console.log(
-    `  Pinned skills:  ${config.raycast.pinned.length > 0 ? pc.magenta(config.raycast.pinned.join(", ")) : pc.dim("(none)")}`,
-  );
-  console.log(
-    `  Global skills:  ${index.global.length > 0 ? pc.dim(index.global.join(", ")) : pc.dim("(none)")} ${pc.dim("(read via ~/.agents/skills)")}`,
-  );
+  const rows: Array<[string, string]> = [
+    ["Folder", pc.dim(getRaycastSkillsDir())],
+    [
+      "Active project",
+      config.raycast.activeProject
+        ? pc.cyan(config.raycast.activeProject)
+        : pc.dim("(none)"),
+    ],
+    [
+      "Pinned skills",
+      config.raycast.pinned.length > 0
+        ? pc.magenta(config.raycast.pinned.join(", "))
+        : pc.dim("(none)"),
+    ],
+    [
+      "Global skills",
+      index.global.length > 0
+        ? `${pc.cyan(index.global.join(", "))} ${pc.dim("(via ~/.agents/skills)")}`
+        : pc.dim("(none)"),
+    ],
+  ];
+
+  console.log("");
+  console.log(renderCard("Raycast bridge", rows));
+  console.log("");
 }

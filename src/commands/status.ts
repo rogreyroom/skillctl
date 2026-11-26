@@ -7,6 +7,7 @@ import {
   loadLibraryIndex,
 } from "../library.js";
 import { resolveGitInfo } from "../linker.js";
+import { badge, renderCard } from "../ui.js";
 
 export async function runStatusCommand(options: {
   dir?: string;
@@ -22,28 +23,49 @@ export async function runStatusCommand(options: {
   );
   const gitInfo = await resolveGitInfo(projectDir);
 
-  const enabledTargets = ["~/.agents/skills"];
-  if (config.agents.claude) enabledTargets.push("~/.claude/skills");
-  if (config.agents.antigravity) enabledTargets.push("~/.gemini/config/skills");
+  const enabledTargets = [pc.cyan("~/.agents/skills")];
+  if (config.agents.claude) enabledTargets.push(pc.cyan("~/.claude/skills"));
+  if (config.agents.antigravity)
+    enabledTargets.push(pc.cyan("~/.gemini/config/skills"));
 
   const repoCount = Object.keys(existing.shared?.skills ?? {}).length;
   const localCount = Object.keys(existing.local?.skills ?? {}).length;
 
-  console.log(pc.bold("skillctl status"));
-  console.log(
-    `  Library:        ${pc.cyan(config.libraryPath)} ${pc.dim(`(${librarySkills.length} skill(s))`)}`,
-  );
-  console.log(`  Global targets: ${pc.dim(enabledTargets.join(", "))}`);
-  console.log(
-    `  Global skills:  ${index.global.length > 0 ? pc.cyan(index.global.join(", ")) : pc.dim("(none)")}`,
-  );
-  console.log(
-    `  Project:        ${pc.bold(path.basename(projectDir))} ${pc.dim(`(${projectDir})`)}${gitInfo?.isWorktree ? pc.yellow(" [git worktree]") : ""}`,
-  );
-  console.log(
-    `    Skills:       ${pc.green(`${repoCount} repo`)}, ${pc.blue(`${localCount} local`)}, ${pc.yellow(`${unmanaged.length} unmanaged`)}`,
-  );
-  console.log(
-    `  Raycast bridge: active=${config.raycast.activeProject ? pc.cyan(path.basename(config.raycast.activeProject)) : pc.dim("(none)")}, pinned=${config.raycast.pinned.length}`,
-  );
+  const projectValue =
+    `${pc.bold(path.basename(projectDir))} ${pc.dim(`(${projectDir})`)}` +
+    (gitInfo?.isWorktree ? ` ${badge("worktree", "yellow")}` : "");
+
+  const projectCounts = [
+    pc.green(`${repoCount} repo`),
+    pc.blue(`${localCount} local`),
+    unmanaged.length > 0
+      ? pc.yellow(`${unmanaged.length} unmanaged`)
+      : pc.dim("0 unmanaged"),
+  ].join(pc.dim(" · "));
+
+  const raycastValue = [
+    `active: ${config.raycast.activeProject ? pc.cyan(path.basename(config.raycast.activeProject)) : pc.dim("none")}`,
+    `pinned: ${config.raycast.pinned.length > 0 ? pc.magenta(String(config.raycast.pinned.length)) : pc.dim("0")}`,
+  ].join(pc.dim(" · "));
+
+  const rows: Array<[string, string]> = [
+    [
+      "Library",
+      `${pc.cyan(config.libraryPath)} ${pc.dim(`(${librarySkills.length} skills)`)}`,
+    ],
+    ["Targets", enabledTargets.join(pc.dim(", "))],
+    [
+      "Global",
+      index.global.length > 0
+        ? index.global.map((g) => pc.cyan(g)).join(pc.dim(", "))
+        : pc.dim("(none)"),
+    ],
+    ["Project", projectValue],
+    ["Project skills", projectCounts],
+    ["Raycast", raycastValue],
+  ];
+
+  console.log("");
+  console.log(renderCard("skillctl status", rows));
+  console.log("");
 }

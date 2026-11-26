@@ -1,8 +1,32 @@
-# skillctl
+<div align="center">
 
-Manage global, per-project, and Raycast AI agent skills from a single central library (default `~/dotfiles/agent-skills`).
+# ◆ skillctl
 
-Works across **VS Code (Copilot)**, **Cursor**, **Raycast**, and **T3 Code (Codex + Claude Code)**.
+**Manage global, per-project, and Raycast AI agent skills from one central library.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-339933.svg)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://www.typescriptlang.org/)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20WSL-lightgrey.svg)](#requirements--environments)
+
+Works across **VS Code (Copilot)**, **Cursor**, **Raycast**, **Antigravity**, and **T3 Code (Codex + Claude Code)**.
+
+</div>
+
+---
+
+## How It Works
+
+```mermaid
+flowchart LR
+  LIB["~/dotfiles/agent-skills<br/>(skills/ + index.yaml)"]
+  LIB -- "global symlinks" --> G1["~/.agents/skills<br/>(VS Code, Cursor, Codex, Raycast)"]
+  LIB -- "optional global" --> G2["~/.gemini/config/skills<br/>(Antigravity)"]
+  LIB -- "optional global" --> G3["~/.claude/skills<br/>(Claude Code)"]
+  LIB -- "raycast use / add" --> RC["~/.config/raycast/skills<br/>(Raycast-only bridge)"]
+  LIB -- "link (.skillctl.local.json)<br/>git-excluded" --> P1["project/.agents/skills/<br/>(personal skills)"]
+  LIB -- "copy (.skillctl.json)<br/>committed to git" --> P2["project/.agents/skills/<br/>(shared team skills)"]
+```
 
 ## Features
 

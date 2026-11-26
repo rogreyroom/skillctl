@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import pc from "picocolors";
 import { runDoctorCommand } from "./commands/doctor.js";
 import {
   runGlobalAddCommand,
@@ -41,7 +42,11 @@ program
   .description(
     "Manage global, per-project, and Raycast AI agent skills from a central library",
   )
-  .version("0.2.0");
+  .version("0.2.0")
+  .addHelpText(
+    "beforeAll",
+    `\n${pc.cyan("◆")} ${pc.bold("skillctl")} ${pc.dim("v0.2.0")} ${pc.dim("— central AI agent skill manager")}\n`,
+  );
 
 program
   .command("setup")

@@ -28,6 +28,7 @@ import {
   getProjectManifestPath,
 } from "../paths.js";
 import type { InstallMode, ProjectManifest } from "../types.js";
+import { badge, formatSkillRow, sectionHeader } from "../ui.js";
 
 export interface AddOptions {
   copy?: boolean;
@@ -340,7 +341,20 @@ export async function runListCommand(options: {
     ].sort();
 
     console.log(
-      pc.bold(`Project: ${path.basename(projectDir)} ${pc.dim(`(${projectDir})`)}`),
+      sectionHeader(
+        `Project: ${path.basename(projectDir)}`,
+        projectDir,
+      ),
+    );
+
+    const nameWidth = Math.min(
+      30,
+      Math.max(
+        14,
+        ...projectSkillNames.map((n) => n.length),
+        ...unmanaged.map((u) => u.name.length),
+        ...index.global.map((g) => g.length),
+      ),
     );
 
     if (projectSkillNames.length === 0 && unmanaged.length === 0) {
@@ -349,84 +363,122 @@ export async function runListCommand(options: {
       for (const name of projectSkillNames) {
         const badges: string[] = [];
         if (sharedSkills[name]) {
-          badges.push(pc.green(`repo:${sharedSkills[name].mode}`));
+          badges.push(badge(`repo:${sharedSkills[name].mode}`, "green"));
         }
         if (localSkills[name]) {
-          badges.push(pc.blue(`local:${localSkills[name].mode}`));
+          badges.push(badge(`local:${localSkills[name].mode}`, "blue"));
         }
         const installed = await pathExists(
           path.join(getProjectAgentsSkillsDir(projectDir), name),
         );
         if (!installed) {
-          badges.push(pc.red("missing on disk"));
+          badges.push(badge("missing on disk", "red"));
         }
         const meta = libraryByName.get(name);
         if (!meta) {
-          badges.push(pc.red("missing in library"));
+          badges.push(badge("missing in library", "red"));
         } else if (meta.issues.length > 0) {
-          badges.push(pc.red(`${meta.issues.length} issue(s)`));
+          badges.push(badge(`${meta.issues.length} issue(s)`, "red"));
         }
 
-        const desc = meta?.description ? pc.dim(` — ${meta.description}`) : "";
-        console.log(`  • ${pc.bold(name)} [${badges.join(", ")}]${desc}`);
+        console.log(
+          formatSkillRow({
+            name,
+            nameWidth,
+            badges,
+            description: meta?.description,
+          }),
+        );
       }
 
       for (const item of unmanaged) {
-        const desc = item.info.description
-          ? pc.dim(` — ${item.info.description}`)
-          : "";
         console.log(
-          `  • ${pc.bold(item.name)} [${pc.yellow(`unmanaged: ${item.relativeSource}`)}]${desc}`,
+          formatSkillRow({
+            name: item.name,
+            nameWidth,
+            badges: [badge(`unmanaged: ${item.relativeSource}`, "yellow")],
+            description: item.info.description,
+          }),
         );
       }
     }
 
     if (index.global.length > 0) {
-      console.log("");
-      console.log(pc.bold("Global skills (also active in this project):"));
+      console.log(
+        sectionHeader("Global skills", "also active in this project"),
+      );
       for (const name of index.global) {
         const meta = libraryByName.get(name);
-        const desc = meta?.description ? pc.dim(` — ${meta.description}`) : "";
-        console.log(`  • ${pc.bold(name)} [${pc.cyan("global")}]${desc}`);
+        console.log(
+          formatSkillRow({
+            name,
+            nameWidth,
+            badges: [badge("global", "cyan")],
+            description: meta?.description,
+          }),
+        );
       }
     }
+    console.log("");
     return;
   }
 
-  console.log(pc.bold(`Library: ${pc.dim(config.libraryPath)}`));
+  console.log(
+    sectionHeader(
+      `Skill Library (${librarySkills.length})`,
+      config.libraryPath,
+    ),
+  );
+  const nameWidth = Math.min(
+    30,
+    Math.max(
+      14,
+      ...librarySkills.map((s) => s.name.length),
+      ...unmanaged.map((u) => u.name.length),
+    ),
+  );
+
   if (librarySkills.length === 0) {
     console.log(pc.dim("  (no skills in library)"));
   } else {
     for (const skill of librarySkills) {
       const badges: string[] = [];
-      if (globalSet.has(skill.name)) badges.push(pc.cyan("global"));
+      if (globalSet.has(skill.name)) badges.push(badge("global", "cyan"));
       if (sharedSkills[skill.name]) {
-        badges.push(pc.green(`repo:${sharedSkills[skill.name].mode}`));
+        badges.push(badge(`repo:${sharedSkills[skill.name].mode}`, "green"));
       }
       if (localSkills[skill.name]) {
-        badges.push(pc.blue(`local:${localSkills[skill.name].mode}`));
+        badges.push(badge(`local:${localSkills[skill.name].mode}`, "blue"));
       }
-      if (raycastPinned.has(skill.name)) badges.push(pc.magenta("raycast-pin"));
+      if (raycastPinned.has(skill.name))
+        badges.push(badge("raycast", "magenta"));
       if (skill.issues.length > 0) {
-        badges.push(pc.red(`${skill.issues.length} issue(s)`));
+        badges.push(badge(`${skill.issues.length} issue(s)`, "red"));
       }
 
-      const badgeStr = badges.length > 0 ? ` [${badges.join(", ")}]` : "";
-      const desc = skill.description ? pc.dim(` — ${skill.description}`) : "";
-      console.log(`  • ${pc.bold(skill.name)}${badgeStr}${desc}`);
+      console.log(
+        formatSkillRow({
+          name: skill.name,
+          nameWidth,
+          badges,
+          description: skill.description,
+        }),
+      );
     }
   }
 
   if (unmanaged.length > 0) {
-    console.log("");
-    console.log(pc.bold("Unmanaged skills in current project:"));
+    console.log(sectionHeader("Unmanaged skills in current project"));
     for (const item of unmanaged) {
-      const desc = item.info.description
-        ? pc.dim(` — ${item.info.description}`)
-        : "";
       console.log(
-        `  • ${pc.bold(item.name)} [${pc.yellow(item.relativeSource)}]${desc}`,
+        formatSkillRow({
+          name: item.name,
+          nameWidth,
+          badges: [badge(item.relativeSource, "yellow")],
+          description: item.info.description,
+        }),
       );
     }
   }
+  console.log("");
 }

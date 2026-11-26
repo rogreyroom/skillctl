@@ -12,6 +12,13 @@ import {
 } from "../library.js";
 import { pathExists, syncGlobal } from "../linker.js";
 import { getLibrarySkillsDir } from "../paths.js";
+import {
+  badge,
+  formatSkillRow,
+  icons,
+  renderCard,
+  sectionHeader,
+} from "../ui.js";
 
 export interface NewSkillOptions {
   description?: string;
@@ -162,17 +169,29 @@ export async function runSearchCommand(query: string): Promise<void> {
     return;
   }
 
-  console.log(pc.bold(`Matches for "${query}" (${matches.length}):`));
+  console.log(
+    sectionHeader(`Search: "${query}"`, `${matches.length} match(es)`),
+  );
+  const nameWidth = Math.min(
+    30,
+    Math.max(14, ...matches.map((s) => s.name.length)),
+  );
   for (const skill of matches) {
     const badges: string[] = [];
-    if (globalSet.has(skill.name)) badges.push(pc.cyan("global"));
+    if (globalSet.has(skill.name)) badges.push(badge("global", "cyan"));
     for (const g of skillGroups.get(skill.name) ?? []) {
-      badges.push(pc.magenta(g));
+      badges.push(badge(g, "magenta"));
     }
-    const badgeStr = badges.length > 0 ? ` [${badges.join(", ")}]` : "";
-    const desc = skill.description ? pc.dim(` — ${skill.description}`) : "";
-    console.log(`  • ${pc.bold(skill.name)}${badgeStr}${desc}`);
+    console.log(
+      formatSkillRow({
+        name: skill.name,
+        nameWidth,
+        badges,
+        description: skill.description,
+      }),
+    );
   }
+  console.log("");
 }
 
 export async function runInfoCommand(skillName: string): Promise<void> {
@@ -211,22 +230,19 @@ export async function runInfoCommand(skillName: string): Promise<void> {
     }
   }
 
-  console.log(pc.bold(skill.name));
-  console.log(`  Path:        ${pc.dim(skill.skillMdPath)}`);
-  console.log(
-    `  Description: ${skill.description ?? pc.yellow("(missing)")}`,
-  );
-  console.log(
-    `  Global:      ${isGlobal ? pc.cyan("yes") : pc.dim("no")}`,
-  );
+  const rows: Array<[string, string]> = [
+    ["Path", pc.dim(skill.skillMdPath)],
+    ["Description", skill.description ?? pc.yellow("(missing)")],
+    ["Global", isGlobal ? badge("global", "cyan") : pc.dim("no")],
+  ];
   if (isRaycastPinned) {
-    console.log(`  Raycast:     ${pc.magenta("pinned")}`);
+    rows.push(["Raycast", badge("pinned", "magenta")]);
   }
   if (groups.length > 0) {
-    console.log(`  Groups:      ${pc.magenta(groups.join(", "))}`);
+    rows.push(["Groups", groups.map((g) => badge(g, "magenta")).join(" ")]);
   }
   if (entry?.source) {
-    console.log(`  Source:      ${pc.dim(entry.source)}`);
+    rows.push(["Source", pc.dim(entry.source)]);
   }
   if (entry?.match) {
     const parts: string[] = [];
@@ -237,21 +253,27 @@ export async function runInfoCommand(skillName: string): Promise<void> {
       parts.push(`files=[${entry.match.files.join(", ")}]`);
     }
     if (parts.length > 0) {
-      console.log(`  Match rules: ${pc.dim(parts.join(" "))}`);
+      rows.push(["Match rules", pc.dim(parts.join(" "))]);
     }
   }
   if (usedIn.length > 0) {
-    console.log(`  Used in:`);
-    for (const u of usedIn) {
-      console.log(`    • ${u.projectDir} ${pc.dim(`[${u.scope}]`)}`);
-    }
+    rows.push([
+      "Used in",
+      usedIn
+        .map((u) => `${path.basename(u.projectDir)} ${pc.dim(`[${u.scope}]`)}`)
+        .join(pc.dim(", ")),
+    ]);
   } else {
-    console.log(`  Used in:     ${pc.dim("(no tracked projects)")}`);
+    rows.push(["Used in", pc.dim("(no tracked projects)")]);
   }
+
+  console.log("");
+  console.log(renderCard(skill.name, rows));
   if (skill.issues.length > 0) {
-    console.log(`  Issues:`);
+    console.log("");
     for (const i of skill.issues) {
-      console.log(`    • ${pc.red(i.message)}`);
+      console.log(`  ${icons.err} ${pc.red(i.message)}`);
     }
   }
+  console.log("");
 }
