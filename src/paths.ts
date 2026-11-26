@@ -77,3 +77,28 @@ export function getLibrarySkillsDir(libraryPath: string): string {
 export function getLibraryIndexPath(libraryPath: string): string {
   return path.join(expandHome(libraryPath), "index.yaml");
 }
+
+const UNSAFE_NAME_RE = /[/\\\0]|\.\./;
+
+export function isSafeSkillSegment(name: string): boolean {
+  if (!name || name === "." || name === "..") return false;
+  if (name.startsWith(".")) return false;
+  if (UNSAFE_NAME_RE.test(name)) return false;
+  return path.basename(name) === name;
+}
+
+export function resolveSafeChildPath(baseDir: string, childName: string): string {
+  if (!isSafeSkillSegment(childName)) {
+    throw new Error(
+      `Unsafe skill name "${childName}": path separators, "..", or leading dots are not allowed.`,
+    );
+  }
+  const resolvedBase = path.resolve(baseDir);
+  const resolvedChild = path.resolve(resolvedBase, childName);
+  if (!resolvedChild.startsWith(resolvedBase + path.sep)) {
+    throw new Error(
+      `Unsafe skill path "${childName}": resolves outside "${resolvedBase}".`,
+    );
+  }
+  return resolvedChild;
+}

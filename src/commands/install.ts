@@ -16,7 +16,10 @@ import {
   getGlobalClaudeSkillsDir,
   getHomeDir,
   getLibrarySkillsDir,
+  isSafeSkillSegment,
+  resolveSafeChildPath,
 } from "../paths.js";
+import { copySkillDir } from "../linker.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -99,7 +102,14 @@ export async function runInstallCommand(
       }
       tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "skillctl-install-"));
       console.log(pc.dim(`Cloning ${repoUrl}...`));
-      await execFileAsync("git", ["clone", "--depth", "1", repoUrl, tempDir]);
+      await execFileAsync("git", [
+        "clone",
+        "--depth",
+        "1",
+        "--",
+        repoUrl,
+        tempDir,
+      ]);
       searchRoot = tempDir;
     }
 
@@ -116,7 +126,15 @@ export async function runInstallCommand(
     for (const dir of skillDirs) {
       const info = await inspectSkillDir(dir);
       const skillName = info.frontmatterName || info.name;
-      const destDir = path.join(librarySkillsDir, skillName);
+      if (!isSafeSkillSegment(skillName)) {
+        console.warn(
+          pc.yellow(
+            `Skipping unsafe skill name "${skillName}" from ${dir}.`,
+          ),
+        );
+        continue;
+      }
+      const destDir = resolveSafeChildPath(librarySkillsDir, skillName);
 
       let exists = false;
       try {
@@ -131,8 +149,7 @@ export async function runInstallCommand(
         continue;
       }
 
-      await fs.rm(destDir, { recursive: true, force: true });
-      await fs.cp(dir, destDir, { recursive: true });
+      await copySkillDir(dir, destDir);
       installed.push(skillName);
     }
 
@@ -229,7 +246,14 @@ export async function runUpdateCommand(skillNames: string[]): Promise<void> {
         }
         tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "skillctl-update-"));
         console.log(pc.dim(`Updating from ${repoUrl}...`));
-        await execFileAsync("git", ["clone", "--depth", "1", repoUrl, tempDir]);
+        await execFileAsync("git", [
+          "clone",
+          "--depth",
+          "1",
+          "--",
+          repoUrl,
+          tempDir,
+        ]);
         searchRoot = tempDir;
       }
 
@@ -239,11 +263,10 @@ export async function runUpdateCommand(skillNames: string[]): Promise<void> {
       for (const dir of skillDirs) {
         const info = await inspectSkillDir(dir);
         const name = info.frontmatterName || info.name;
-        if (!wantedSet.has(name)) continue;
+        if (!wantedSet.has(name) || !isSafeSkillSegment(name)) continue;
 
-        const destDir = path.join(librarySkillsDir, name);
-        await fs.rm(destDir, { recursive: true, force: true });
-        await fs.cp(dir, destDir, { recursive: true });
+        const destDir = resolveSafeChildPath(librarySkillsDir, name);
+        await copySkillDir(dir, destDir);
         updated.push(name);
       }
     } finally {

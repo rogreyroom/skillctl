@@ -8,6 +8,8 @@ import {
   getProjectAgentsSkillsDir,
   getProjectClaudeSkillsDir,
   getProjectCursorSkillsDir,
+  isSafeSkillSegment,
+  resolveSafeChildPath,
 } from "./paths.js";
 import type {
   LibraryIndex,
@@ -349,7 +351,13 @@ export async function discoverProjectUnmanagedSkills(
 
       const info = await inspectSkillDir(fullPath);
       const skillName = info.frontmatterName || info.name;
-      if (libraryNames.has(skillName) || found.has(skillName)) continue;
+      if (
+        !isSafeSkillSegment(skillName) ||
+        libraryNames.has(skillName) ||
+        found.has(skillName)
+      ) {
+        continue;
+      }
 
       found.set(skillName, {
         name: skillName,
@@ -369,8 +377,17 @@ export async function importSkillDirToLibrary(
   skillName: string,
 ): Promise<string> {
   await ensureLibraryScaffold(libraryPath);
-  const destDir = path.join(getLibrarySkillsDir(libraryPath), skillName);
+  const destDir = resolveSafeChildPath(
+    getLibrarySkillsDir(libraryPath),
+    skillName,
+  );
   await fs.rm(destDir, { recursive: true, force: true });
-  await fs.cp(sourceDir, destDir, { recursive: true });
+  await fs.cp(sourceDir, destDir, {
+    recursive: true,
+    filter: async (src) => {
+      const stat = await fs.lstat(src);
+      return !stat.isSymbolicLink();
+    },
+  });
   return destDir;
 }

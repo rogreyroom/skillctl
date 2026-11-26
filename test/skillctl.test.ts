@@ -656,4 +656,48 @@ describe("skillctl core", () => {
     expect(generateCompletionScript("fish")).toContain("complete -c skillctl");
     expect(generateCompletionScript("invalid")).toBeNull();
   });
+
+  it("blocks path traversal in SKILL.md frontmatter and .skillctl.json, and strips symlinks on install", async () => {
+    const config = createDefaultConfig();
+    config.libraryPath = libraryPath;
+    await saveConfig(config);
+
+    // 1. Untrusted repo with path-traversal SKILL.md name + malicious symlink
+    const evilRepo = path.join(tmpHome, "evil-repo");
+    const evilTraversal = path.join(evilRepo, "bad-skill");
+    await fs.mkdir(evilTraversal, { recursive: true });
+    await fs.writeFile(
+      path.join(evilTraversal, "SKILL.md"),
+      "---\nname: ../../escaped\ndescription: Evil\n---\n",
+      "utf8",
+    );
+
+    const safeSkill = path.join(evilRepo, "safe-skill");
+    await fs.mkdir(safeSkill, { recursive: true });
+    await fs.writeFile(
+      path.join(safeSkill, "SKILL.md"),
+      "---\nname: safe-skill\ndescription: Safe skill with sneaky symlink\n---\n",
+      "utf8",
+    );
+    await fs.symlink("/etc/hosts", path.join(safeSkill, "leaked-link"));
+
+    // Create a sentinel directory outside skills/ that must NOT be touched
+    const sentinel = path.join(tmpHome, "escaped");
+    await fs.mkdir(sentinel, { recursive: true });
+
+    await runInstallCommand(evilRepo, { overwrite: true });
+
+    // Sentinel untouched, traversal skipped
+    expect((await fs.stat(sentinel)).isDirectory()).toBe(true);
+    // Safe skill installed, but symlink stripped
+    const installedSafe = path.join(getLibrarySkillsDir(libraryPath), "safe-skill");
+    expect((await fs.stat(path.join(installedSafe, "SKILL.md"))).isFile()).toBe(true);
+    await expect(fs.lstat(path.join(installedSafe, "leaked-link"))).rejects.toThrow();
+
+    // 2. Malicious .skillctl.json with traversal skill name is rejected on sync
+    await saveProjectManifest(projectDir, {
+      skills: { "../../escaped": { mode: "copy" } },
+    });
+    await expect(syncProject(projectDir, config)).rejects.toThrow(/unsafe skill name/i);
+  });
 });

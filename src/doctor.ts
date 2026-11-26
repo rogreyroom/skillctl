@@ -28,6 +28,8 @@ import {
   getProjectLocalManifestPath,
   getProjectManifestPath,
   getRaycastSkillsDir,
+  isSafeSkillSegment,
+  resolveSafeChildPath,
 } from "./paths.js";
 import type { AppConfig, DoctorIssue } from "./types.js";
 
@@ -212,6 +214,16 @@ export async function runDoctor(
       const useClaude = manifest.claude ?? config.agents.claude;
 
       for (const [skillName, entry] of Object.entries(manifest.skills)) {
+        if (!isSafeSkillSegment(skillName)) {
+          issues.push({
+            severity: "error",
+            scope: "project",
+            code: "unsafe-skill-name",
+            message: `Project manifest contains unsafe skill name "${skillName}".`,
+            fixable: false,
+          });
+          continue;
+        }
         // Missing in library
         if (!availableNames.has(skillName)) {
           issues.push({
@@ -253,7 +265,7 @@ export async function runDoctor(
         }
 
         // Missing link/copy on disk
-        const installedPath = path.join(
+        const installedPath = resolveSafeChildPath(
           getProjectAgentsSkillsDir(projectDir),
           skillName,
         );

@@ -15,6 +15,8 @@ import {
   getProjectClaudeSkillsDir,
   getProjectLocalManifestPath,
   getRaycastSkillsDir,
+  isSafeSkillSegment,
+  resolveSafeChildPath,
 } from "./paths.js";
 import type { AppConfig, LibraryIndex, ProjectManifest } from "./types.js";
 
@@ -106,7 +108,13 @@ export async function copySkillDir(
 ): Promise<string> {
   await fs.mkdir(path.dirname(destDir), { recursive: true });
   await fs.rm(destDir, { recursive: true, force: true });
-  await fs.cp(sourceDir, destDir, { recursive: true });
+  await fs.cp(sourceDir, destDir, {
+    recursive: true,
+    filter: async (src) => {
+      const stat = await fs.lstat(src);
+      return !stat.isSymbolicLink();
+    },
+  });
   return computeDirHash(destDir);
 }
 
@@ -164,12 +172,16 @@ export async function syncGlobal(
     await ensureRealDirectory(targetDir);
 
     for (const skillName of desired) {
-      const sourceDir = path.join(librarySkillsDir, skillName);
+      if (!isSafeSkillSegment(skillName)) continue;
+      const sourceDir = resolveSafeChildPath(librarySkillsDir, skillName);
       if (!(await pathExists(sourceDir))) {
         missing.add(skillName);
         continue;
       }
-      await ensureSymlink(sourceDir, path.join(targetDir, skillName));
+      await ensureSymlink(
+        sourceDir,
+        resolveSafeChildPath(targetDir, skillName),
+      );
       linked.add(skillName);
     }
 
@@ -341,13 +353,18 @@ export async function syncProject(
     await ensureRealDirectory(target.dir);
 
     for (const [skillName, entry] of Object.entries(manifest.skills)) {
-      const sourceDir = path.join(librarySkillsDir, skillName);
+      if (!isSafeSkillSegment(skillName)) {
+        throw new Error(
+          `Refusing to sync unsafe skill name "${skillName}" from project manifest.`,
+        );
+      }
+      const sourceDir = resolveSafeChildPath(librarySkillsDir, skillName);
       if (!(await pathExists(sourceDir))) {
         missing.add(skillName);
         continue;
       }
 
-      const destPath = path.join(target.dir, skillName);
+      const destPath = resolveSafeChildPath(target.dir, skillName);
       if (entry.mode === "copy") {
         const hash = await copySkillDir(sourceDir, destPath);
         if (entry.hash !== hash) {
@@ -407,10 +424,13 @@ export async function removeProjectSkillFiles(
   skillName: string,
   includeClaude: boolean,
 ): Promise<void> {
+  if (!isSafeSkillSegment(skillName)) {
+    throw new Error(`Refusing to remove unsafe skill name "${skillName}".`);
+  }
   const dirs = [getProjectAgentsSkillsDir(projectDir)];
   if (includeClaude) dirs.push(getProjectClaudeSkillsDir(projectDir));
   for (const dir of dirs) {
-    const p = path.join(dir, skillName);
+    const p = resolveSafeChildPath(dir, skillName);
     await fs.rm(p, { recursive: true, force: true });
   }
 }
@@ -451,12 +471,16 @@ export async function syncRaycast(
   const missing: string[] = [];
 
   for (const skillName of desired) {
-    const sourceDir = path.join(librarySkillsDir, skillName);
+    if (!isSafeSkillSegment(skillName)) continue;
+    const sourceDir = resolveSafeChildPath(librarySkillsDir, skillName);
     if (!(await pathExists(sourceDir))) {
       missing.push(skillName);
       continue;
     }
-    await ensureSymlink(sourceDir, path.join(raycastDir, skillName));
+    await ensureSymlink(
+      sourceDir,
+      resolveSafeChildPath(raycastDir, skillName),
+    );
     linked.push(skillName);
   }
 
