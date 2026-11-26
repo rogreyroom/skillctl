@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="color-scheme" content="dark" />
   <title>skillctl — Central AI Agent Skill Manager</title>
   <meta
     name="description"
@@ -27,8 +29,12 @@
   />
   <style>
     *, *::before, *::after { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    html, body { margin: 0; padding: 0; }
+    html {
+      scroll-behavior: smooth;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-text-size-adjust: 100%;
+    }
+    html, body { margin: 0; padding: 0; overflow-x: clip; }
 
     :root {
       --bg: #111111;
@@ -73,56 +79,79 @@
     code { font-family: var(--mono); }
     button { font-family: inherit; }
 
-    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 24px 80px; }
+    /* Native touch feel on controls (content stays selectable) */
+    button, a, [role="tab"] {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding:
+        calc(20px + env(safe-area-inset-top, 0px))
+        calc(24px + env(safe-area-inset-right, 0px))
+        calc(72px + env(safe-area-inset-bottom, 0px))
+        calc(24px + env(safe-area-inset-left, 0px));
+    }
 
     /* Topbar */
     .topbar {
       display: grid;
       grid-template-columns: auto 1fr auto;
       align-items: center;
-      gap: 24px;
-      padding: 14px 18px;
+      gap: 20px;
+      padding: 12px 16px;
       border: 1px solid var(--line);
       background: var(--surface);
     }
     .logo {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--ink);
       text-decoration: none;
+      white-space: nowrap;
     }
     .logo-mark {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       background: var(--orange);
       color: #111;
       display: grid;
       place-items: center;
       font-family: var(--mono);
       font-weight: 700;
-      font-size: 16px;
+      font-size: 15px;
+      flex-shrink: 0;
     }
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 22px;
+      gap: 20px;
       font-family: var(--mono);
       font-size: 11px;
       letter-spacing: 0.09em;
       text-transform: uppercase;
-      flex-wrap: wrap;
+      min-width: 0;
     }
     .nav-links a {
       color: var(--muted);
       text-decoration: none;
+      padding: 6px 0;
+      white-space: nowrap;
       transition: color 140ms var(--ease-out);
     }
-    .nav-links a:hover { color: var(--orange); }
-    .nav-links .status-pill { color: var(--muted); margin-left: auto; }
+    .nav-links .status-pill {
+      color: var(--muted);
+      margin-left: auto;
+      white-space: nowrap;
+    }
     .nav-links .status-pill b { color: var(--orange); font-weight: 500; }
 
     .cta {
@@ -144,12 +173,14 @@
       cursor: pointer;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 120ms var(--ease-out);
+      white-space: nowrap;
+      transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 110ms var(--ease-out);
     }
-    .cta:hover { background: var(--orange); color: #111; }
     .cta:active { transform: scale(0.97); }
     .cta:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+    .cta[data-copied] { background: var(--orange); color: #111; }
 
     .btn-ghost {
       border: 1px solid var(--line-strong);
@@ -164,12 +195,14 @@
       text-decoration: none;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      transition: border-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 120ms var(--ease-out);
+      white-space: nowrap;
+      transition: border-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 110ms var(--ease-out);
     }
-    .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
     .btn-ghost:active { transform: scale(0.97); }
     .btn-ghost:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+    .btn-ghost[data-copied] { border-color: var(--orange); color: var(--orange); }
 
     /* Agent Ticker */
     .ticker {
@@ -177,34 +210,39 @@
       justify-content: space-between;
       align-items: center;
       gap: 14px;
-      flex-wrap: wrap;
-      padding: 12px 18px;
+      padding: 11px 16px;
       border-left: 1px solid var(--line);
       border-right: 1px solid var(--line);
       border-bottom: 1px dashed rgba(255, 85, 0, 0.48);
       font-family: var(--mono);
-      font-size: 12px;
-      letter-spacing: 0.1em;
+      font-size: 11.5px;
+      letter-spacing: 0.09em;
       text-transform: uppercase;
       color: #bdb7aa;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      white-space: nowrap;
     }
-    .ticker .sep { color: rgba(255, 85, 0, 0.55); }
+    .ticker::-webkit-scrollbar { display: none; }
+    .ticker .sep { color: rgba(255, 85, 0, 0.55); flex-shrink: 0; }
 
     /* Hero */
     .hero {
       display: grid;
-      grid-template-columns: 1fr 1.12fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
       gap: 36px;
-      padding: 48px 0 40px;
+      padding: 44px 0 40px;
       border-bottom: 1px solid var(--line);
     }
+    .hero > * { min-width: 0; }
     h1 {
       margin: 0 0 18px;
-      font-size: clamp(40px, 5.4vw, 66px);
+      font-size: clamp(36px, 5.4vw, 66px);
       line-height: 0.96;
       letter-spacing: -0.04em;
     }
-    .rule { height: 6px; background: var(--orange); width: 100%; margin: 20px 0; }
+    .rule { height: 6px; background: var(--orange); width: 100%; margin: 18px 0; }
     .hero-copy {
       font-size: 16px;
       line-height: 1.6;
@@ -220,19 +258,27 @@
     }
     .ascii-box {
       font-family: var(--mono);
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--muted);
-      line-height: 1.75;
+      line-height: 1.7;
       border-top: 1px dashed var(--line);
       border-bottom: 1px dashed var(--line);
-      padding: 14px 0;
-      margin: 22px 0;
+      padding: 12px 0;
+      margin: 20px 0;
+      display: grid;
+      gap: 2px;
+    }
+    .ascii-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
     }
     .ascii-box b { color: var(--orange); font-weight: 500; }
     .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
     .hatch {
-      height: 32px;
-      margin-top: 24px;
+      height: 28px;
+      margin-top: 22px;
       background: repeating-linear-gradient(
         -45deg,
         rgba(236, 230, 216, 0.11),
@@ -249,6 +295,7 @@
       display: flex;
       flex-direction: column;
       position: relative;
+      min-width: 0;
     }
     .console::before, .console::after {
       content: "";
@@ -263,11 +310,31 @@
     .console::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
 
     .console-tabs {
+      position: relative;
       display: flex;
       border-bottom: 1px solid var(--line);
       overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .console-tabs::-webkit-scrollbar { display: none; }
+    .tab-indicator {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      background: var(--orange);
+      pointer-events: none;
+      will-change: transform;
+    }
+    .console-tabs[data-ready] .tab-indicator {
+      transition:
+        transform 200ms var(--ease-out),
+        width 200ms var(--ease-out);
     }
     .cmd-tab {
+      position: relative;
+      z-index: 1;
       border: 0;
       border-right: 1px solid var(--line);
       background: transparent;
@@ -277,31 +344,39 @@
       padding: 11px 14px;
       cursor: pointer;
       white-space: nowrap;
-      transition: color 140ms var(--ease-out), background-color 140ms var(--ease-out);
+      flex-shrink: 0;
+      transition: color 140ms var(--ease-out), transform 110ms var(--ease-out);
     }
-    .cmd-tab:hover { color: var(--ink); }
-    .cmd-tab[data-active] { color: #111; background: var(--orange); font-weight: 600; }
+    .cmd-tab:active { transform: scale(0.97); }
+    .cmd-tab[data-active] { color: #111; font-weight: 600; }
     .console-body {
-      padding: 20px;
+      padding: 18px;
       font-family: var(--mono);
-      font-size: 13px;
+      font-size: 12.5px;
       line-height: 1.65;
       flex: 1;
-      min-height: 300px;
-      white-space: pre-wrap;
+      min-height: 270px;
+      white-space: pre;
       color: #dcd6ca;
       overflow-x: auto;
+      overscroll-behavior-x: contain;
+      -webkit-overflow-scrolling: touch;
     }
     .console-foot {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 10px 16px;
+      padding: 10px 14px;
       border-top: 1px solid var(--line);
       font-family: var(--mono);
       font-size: 11px;
       color: var(--muted);
+    }
+    .console-foot span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .copy-sm {
       border: 1px solid var(--line);
@@ -309,23 +384,25 @@
       color: var(--ink);
       font-family: var(--mono);
       font-size: 11px;
-      padding: 5px 10px;
+      padding: 6px 10px;
       cursor: pointer;
       text-transform: uppercase;
       letter-spacing: 0.06em;
+      white-space: nowrap;
+      flex-shrink: 0;
       transition: border-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 110ms var(--ease-out);
     }
-    .copy-sm:hover { border-color: var(--orange); color: var(--orange); }
     .copy-sm:active { transform: scale(0.97); }
+    .copy-sm[data-copied] { border-color: var(--orange); color: var(--orange); }
 
     /* Section Header */
-    .section { padding: 48px 0; border-bottom: 1px solid var(--line); }
+    .section { padding: 44px 0; border-bottom: 1px solid var(--line); }
     .section-head {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 24px;
+      gap: 12px;
+      margin-bottom: 22px;
       flex-wrap: wrap;
     }
     .section-head h2 {
@@ -344,17 +421,16 @@
     /* Feature Grid */
     .grid-3 {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 16px;
     }
     .card {
       border: 1px solid var(--line);
       background: var(--surface);
-      padding: 22px;
-      position: relative;
+      padding: 20px;
+      min-width: 0;
       transition: border-color 150ms var(--ease-out);
     }
-    .card:hover { border-color: rgba(255, 85, 0, 0.45); }
     .card-num {
       font-family: var(--mono);
       font-size: 11px;
@@ -369,7 +445,7 @@
     /* Quickstart Steps */
     .steps {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       border: 1px solid var(--line);
       background: var(--surface);
     }
@@ -380,6 +456,7 @@
       flex-direction: column;
       justify-content: space-between;
       gap: 14px;
+      min-width: 0;
     }
     .step:last-child { border-right: 0; }
     .step-code {
@@ -389,11 +466,18 @@
       gap: 8px;
       background: var(--surface-2);
       border: 1px solid var(--line);
-      padding: 10px 12px;
+      padding: 9px 11px;
       font-family: var(--mono);
       font-size: 12.5px;
       color: var(--ink);
+      min-width: 0;
     }
+    .step-code code {
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: none;
+    }
+    .step-code code::-webkit-scrollbar { display: none; }
     .step p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
 
     /* Command Reference Table */
@@ -408,11 +492,13 @@
     .search-input {
       background: var(--surface-2);
       border: 1px solid var(--line-strong);
+      border-radius: 0;
+      -webkit-appearance: none;
       color: var(--ink);
       font-family: var(--mono);
-      font-size: 13px;
+      font-size: 14px;
       padding: 10px 14px;
-      width: 320px;
+      width: 340px;
       max-width: 100%;
     }
     .search-input:focus { outline: 2px solid var(--orange); outline-offset: -1px; }
@@ -452,11 +538,11 @@
     /* Platforms */
     .platforms {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       border: 1px solid var(--line);
       background: var(--surface);
     }
-    .plat { padding: 22px; border-right: 1px solid var(--line); }
+    .plat { padding: 20px; border-right: 1px solid var(--line); min-width: 0; }
     .plat:last-child { border-right: 0; }
     .plat h3 {
       margin: 0 0 8px;
@@ -476,6 +562,7 @@
       font-size: 12px;
       color: #d9d3c6;
       overflow-x: auto;
+      overscroll-behavior-x: contain;
     }
 
     /* Footer */
@@ -484,24 +571,97 @@
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 16px;
-      padding-top: 28px;
+      gap: 14px;
+      padding-top: 26px;
       font-family: var(--mono);
       font-size: 12px;
       color: var(--muted);
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
-    .footer a { color: var(--ink); text-decoration: none; }
-    .footer a:hover { color: var(--orange); }
+    .footer a { color: var(--ink); text-decoration: none; padding: 6px 0; }
 
+    /* Gate ALL hover effects behind pointer capability (mobile-native §1) */
+    @media (hover: hover) and (pointer: fine) {
+      .nav-links a:hover { color: var(--orange); }
+      .cta:hover { background: var(--orange); color: #111; }
+      .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
+      .cmd-tab:hover { color: var(--ink); }
+      .cmd-tab[data-active]:hover { color: #111; }
+      .copy-sm:hover { border-color: var(--orange); color: var(--orange); }
+      .card:hover { border-color: rgba(255, 85, 0, 0.45); }
+      .footer a:hover { color: var(--orange); }
+    }
+
+    /* Touch comfort & iOS input zoom prevention (mobile-native §4 & §5) */
+    @media (pointer: coarse) {
+      .search-input { font-size: 16px; min-height: 44px; }
+      .cta, .btn-ghost { min-height: 44px; }
+      .cmd-tab { min-height: 44px; padding: 0 14px; }
+      .copy-sm { min-height: 36px; padding: 0 12px; }
+    }
+
+    /* Mobile layout */
     @media (max-width: 900px) {
-      .topbar { grid-template-columns: 1fr; }
-      .nav-links .status-pill { margin-left: 0; }
-      .hero, .grid-3, .steps, .platforms { grid-template-columns: 1fr; }
+      .wrap {
+        padding:
+          calc(14px + env(safe-area-inset-top, 0px))
+          calc(16px + env(safe-area-inset-right, 0px))
+          calc(56px + env(safe-area-inset-bottom, 0px))
+          calc(16px + env(safe-area-inset-left, 0px));
+      }
+      .topbar {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          "logo cta"
+          "nav  nav";
+        gap: 10px 12px;
+        padding: 12px 14px;
+      }
+      .logo { grid-area: logo; }
+      .topbar .cta { grid-area: cta; padding: 8px 12px; font-size: 11px; }
+      .nav-links {
+        grid-area: nav;
+        border-top: 1px solid var(--line);
+        padding-top: 8px;
+        gap: 16px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+      }
+      .nav-links::-webkit-scrollbar { display: none; }
+      .nav-links .status-pill { display: none; }
+
+      .hero { grid-template-columns: 1fr; gap: 24px; padding: 28px 0 30px; }
+      .hero-actions { flex-direction: column; }
+      .hero-actions .cta, .hero-actions .btn-ghost { width: 100%; }
+      .console-body { font-size: 11.5px; padding: 14px; min-height: 220px; }
+
+      .section { padding: 34px 0; }
+      .grid-3, .steps, .platforms { grid-template-columns: 1fr; }
       .step, .plat { border-right: 0; border-bottom: 1px solid var(--line); }
       .step:last-child, .plat:last-child { border-bottom: 0; }
-      .cmd-table td:first-child { white-space: normal; }
+    }
+
+    /* Transform command table into clean stacked cards on phones */
+    @media (max-width: 680px) {
+      .search-input { width: 100%; }
+      .cmd-table, .cmd-table tbody, .cmd-table tr, .cmd-table td { display: block; width: 100%; }
+      .cmd-table thead { display: none; }
+      .cmd-table tr {
+        padding: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .cmd-table tr:last-child { border-bottom: 0; }
+      .cmd-table td { padding: 0; border-bottom: 0; }
+      .cmd-table td:first-child {
+        white-space: normal;
+        word-break: break-word;
+        color: var(--orange);
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+      .cmd-table td:last-child { font-size: 13.5px; }
     }
   </style>
 </head>
@@ -545,9 +705,9 @@
             committed team copies, and switch Raycast context in one command.
           </p>
           <div class="ascii-box">
-***  SKILLCTL // CENTRAL SKILL OPERATIONS — <b>v0.2.0</b>       ***<br />
-***  TARGETS:  .agents/ · .claude/ · .gemini/ · raycast  ***<br />
-***  SECURITY: PATH-SAFE · NO SYMLINK LEAKS · <b>0 VULNS</b>    ***
+            <div class="ascii-row"><span>SKILLCTL // CENTRAL SKILL OPS</span><b>v0.2.0 · MIT</b></div>
+            <div class="ascii-row"><span>TARGETS</span><span>.agents/ · .claude/ · .gemini/ · raycast</span></div>
+            <div class="ascii-row"><span>SECURITY</span><b>PATH-SAFE · 0 VULNS</b></div>
           </div>
           <div class="hero-actions">
             <button
@@ -566,6 +726,7 @@
 
         <div class="console" aria-label="Interactive CLI output preview">
           <div class="console-tabs" role="tablist">
+            <span class="tab-indicator" aria-hidden="true"></span>
             <button class="cmd-tab" role="tab" data-demo="status" data-active>status</button>
             <button class="cmd-tab" role="tab" data-demo="init">init</button>
             <button class="cmd-tab" role="tab" data-demo="list">list -p</button>
@@ -691,10 +852,13 @@
             id="cmd-filter"
             class="search-input"
             type="search"
+            autocapitalize="none"
+            autocorrect="off"
+            enterkeyhint="search"
             placeholder="Filter commands (e.g. raycast, group, doctor)..."
             aria-label="Filter CLI commands"
           />
-          <span class="section-kicker" id="cmd-count">15 COMMANDS</span>
+          <span class="section-kicker" id="cmd-count">17 COMMANDS</span>
         </div>
         <table class="cmd-table">
           <thead>
@@ -766,27 +930,27 @@
 │  • nuxt-api-development (dep "nuxt", file "nuxt.config.ts")
 │  • drizzle-migration    (dep "drizzle-orm")
 │
-├─ Storage mode: Mixed (repo → .skillctl.json, personal → .skillctl.local.json)
+├─ Storage mode: Mixed (.skillctl.json + .skillctl.local.json)
 ├─ Excluded personal links in .git/info/exclude
 └─ ✓ Synced project skills (2 personal linked, 1 repo copied)`
       },
       list: {
         cmd: "skillctl list --project",
         out: `◆ Project: farm24-app /Users/robert/farm24-app
-  • drizzle-migration-review  repo:copy   Checklist for Drizzle + SQLite…
-  • nuxt-api-development      local:link  Build Nuxt server API handlers…
-  • vitest                    local:link  Vitest fast unit testing…
+  • drizzle-migration-review  repo:copy   Drizzle + SQLite…
+  • nuxt-api-development      local:link  Nuxt API handlers…
+  • vitest                    local:link  Vitest unit tests…
 
 ◆ Global skills also active in this project
-  • find-skills               global      Helps users discover and install…
-  • grill-me                  global      Interview the user relentlessly…`
+  • find-skills               global      Discover agent skills…
+  • grill-me                  global      Stress-test a plan…`
       },
       doctor: {
         cmd: "skillctl doctor --fix",
         out: `◆ skillctl doctor /Users/robert/farm24-app
-  FIXED  [global]  Legacy skill "nuxt-code-review" in ~/.cursor/skills/
-  FIXED  [project] Copied skill "drizzle-migration" drifted (synced to library)
-  FIXED  [raycast] Removed duplicate "find-skills" (already global)
+  FIXED  [global]  Legacy skill in ~/.cursor/skills/
+  FIXED  [project] Copied skill drifted (synced to library)
+  FIXED  [raycast] Removed duplicate (already global)
 
   ✓ Doctor finished: 3 fixed, 0 remaining.`
       },
@@ -821,22 +985,39 @@
       ["skillctl completion <zsh|bash|fish>", "Print dynamic shell autocompletion script for subcommands, live skills, and @groups."]
     ];
 
-    // Copy buttons
+    // Interruptible copy buttons
+    const copyTimers = new WeakMap();
     document.querySelectorAll("[data-copy]").forEach((btn) => {
+      const originalLabel = btn.textContent;
       btn.addEventListener("click", () => {
         const text = btn.getAttribute("data-copy");
         navigator.clipboard?.writeText(text).catch(() => {});
-        const prev = btn.textContent;
+        clearTimeout(copyTimers.get(btn));
         btn.textContent = "COPIED ✓";
-        setTimeout(() => { btn.textContent = prev; }, 1500);
+        btn.setAttribute("data-copied", "");
+        copyTimers.set(
+          btn,
+          setTimeout(() => {
+            btn.textContent = originalLabel;
+            btn.removeAttribute("data-copied");
+          }, 1400)
+        );
       });
     });
 
-    // Interactive console tabs
+    // Interactive console tabs with sliding indicator (instant content swap)
+    const tabsContainer = document.querySelector(".console-tabs");
+    const indicator = tabsContainer.querySelector(".tab-indicator");
     const outEl = document.getElementById("console-out");
     const cmdEl = document.getElementById("console-cmd");
     const copyEl = document.getElementById("console-copy");
-    const tabs = [...document.querySelectorAll(".cmd-tab")];
+    const tabs = [...tabsContainer.querySelectorAll(".cmd-tab")];
+    let activeTab = tabs[0];
+
+    function syncIndicator(el) {
+      indicator.style.width = el.offsetWidth + "px";
+      indicator.style.transform = `translateX(${el.offsetLeft}px)`;
+    }
 
     function showDemo(key) {
       const d = CONSOLE_DEMOS[key];
@@ -844,13 +1025,20 @@
         const active = t.dataset.demo === key;
         t.toggleAttribute("data-active", active);
         t.setAttribute("aria-selected", String(active));
+        if (active) activeTab = t;
       });
+      syncIndicator(activeTab);
       outEl.textContent = d.out;
       cmdEl.textContent = "$ " + d.cmd;
       copyEl.setAttribute("data-copy", d.cmd);
     }
+
     tabs.forEach((t) => t.addEventListener("click", () => showDemo(t.dataset.demo)));
+    window.addEventListener("resize", () => syncIndicator(activeTab));
     showDemo("status");
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => tabsContainer.setAttribute("data-ready", ""))
+    );
 
     // Searchable command table
     const tbody = document.getElementById("cmd-tbody");
