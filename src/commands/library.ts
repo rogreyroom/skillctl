@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import * as p from "@clack/prompts";
@@ -5,6 +6,7 @@ import pc from "picocolors";
 import { loadConfig, loadMergedProjectManifest } from "../config.js";
 import {
   ensureLibraryScaffold,
+  inspectSkillDir,
   isValidSkillName,
   listLibrarySkills,
   loadLibraryIndex,
@@ -276,4 +278,65 @@ export async function runInfoCommand(skillName: string): Promise<void> {
     }
   }
   console.log("");
+}
+
+export async function runEditCommand(skillName?: string): Promise<void> {
+  const config = await loadConfig();
+  const skills = await listLibrarySkills(config.libraryPath);
+
+  if (skills.length === 0) {
+    console.log(pc.yellow("No skills found in library."));
+    return;
+  }
+
+  let targetName = skillName;
+  if (!targetName) {
+    const chosen = await p.select({
+      message: "Select a skill to edit:",
+      options: skills.map((s) => ({
+        value: s.name,
+        label: s.name,
+        hint: s.description,
+      })),
+    });
+    if (p.isCancel(chosen)) {
+      p.cancel("Cancelled.");
+      return;
+    }
+    targetName = String(chosen);
+  }
+
+  const skill = skills.find((s) => s.name === targetName);
+  if (!skill) {
+    console.error(pc.red(`Skill "${targetName}" not found in library.`));
+    process.exitCode = 1;
+    return;
+  }
+
+  const editorCmd = process.env.VISUAL || process.env.EDITOR || "vi";
+  const parts = editorCmd.split(/\s+/).filter(Boolean);
+  const bin = parts[0]!;
+  const args = [...parts.slice(1), skill.skillMdPath];
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(bin, args, { stdio: "inherit" });
+    child.on("error", reject);
+    child.on("exit", () => resolve());
+  });
+
+  // Post-edit validation so Raycast never silently drops a broken edit
+  const updated = await inspectSkillDir(skill.dirPath);
+  if (updated.issues.length === 0) {
+    console.log(
+      `${icons.ok} ${pc.green(`${updated.name}/SKILL.md is valid.`)}`,
+    );
+  } else {
+    console.log(
+      `${icons.warn} ${pc.yellow(`Validation issues in ${updated.name}/SKILL.md:`)}`,
+    );
+    for (const issue of updated.issues) {
+      console.log(`  ${icons.err} ${pc.red(issue.message)}`);
+    }
+    process.exitCode = 1;
+  }
 }

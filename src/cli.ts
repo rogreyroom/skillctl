@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import pc from "picocolors";
+import {
+  runCompletionCommand,
+  runInternalCompleteCommand,
+} from "./commands/completion.js";
 import { runDoctorCommand } from "./commands/doctor.js";
 import {
   runGlobalAddCommand,
@@ -8,6 +12,11 @@ import {
   runGlobalRmCommand,
   runGlobalSyncCommand,
 } from "./commands/global.js";
+import {
+  runGroupAddCommand,
+  runGroupListCommand,
+  runGroupRmCommand,
+} from "./commands/group.js";
 import { runInitCommand } from "./commands/init.js";
 import {
   runInstallCommand,
@@ -15,6 +24,7 @@ import {
   runUpdateCommand,
 } from "./commands/install.js";
 import {
+  runEditCommand,
   runInfoCommand,
   runNewSkillCommand,
   runSearchCommand,
@@ -108,6 +118,11 @@ program
   .action(runNewSkillCommand);
 
 program
+  .command("edit [skill]")
+  .description("Open a skill's SKILL.md in $EDITOR and validate frontmatter on save")
+  .action(runEditCommand);
+
+program
   .command("search <query>")
   .description("Search library skills by name, description, group, or match rules")
   .action(runSearchCommand);
@@ -116,6 +131,26 @@ program
   .command("info <skill>")
   .description("Show details, rules, and tracked project usage for a skill")
   .action(runInfoCommand);
+
+const groupCmd = program
+  .command("group")
+  .description("Manage @group skill bundles in index.yaml");
+
+groupCmd
+  .command("list")
+  .alias("ls")
+  .description("List all skill groups")
+  .action(runGroupListCommand);
+
+groupCmd
+  .command("add <group> [skills...]")
+  .description("Create or add skills to a @group bundle")
+  .action(runGroupAddCommand);
+
+groupCmd
+  .command("rm <group> [skills...]")
+  .description("Remove skills from a group (or delete the group if no skills given)")
+  .action(runGroupRmCommand);
 
 program
   .command("list")
@@ -206,6 +241,15 @@ program
   .option("--fix", "Automatically repair fixable issues")
   .option("--dir <path>", "Target project directory")
   .action(runDoctorCommand);
+
+program
+  .command("completion <shell>")
+  .description("Print shell autocompletion script (zsh, bash, or fish)")
+  .action(runCompletionCommand);
+
+program
+  .command("__complete <kind>", { hidden: true })
+  .action(runInternalCompleteCommand);
 
 program.addHelpText(
   "after",

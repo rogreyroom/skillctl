@@ -136,14 +136,17 @@ Run `skillctl --help` or `skillctl <command> --help` for all flags.
 | `skillctl sync` | Rebuild symlinks/copies from `.skillctl.json` and `.skillctl.local.json` (`--all` for all tracked projects; auto-inherits local manifest in git worktrees) |
 | `skillctl list` (`ls`) | List all library skills (`-p, --project` to show only skills active in the current project) |
 | `skillctl new <name>` | Scaffold a new kebab-case skill with Raycast-valid `SKILL.md` frontmatter and optional match rules |
+| `skillctl edit [skill]` | Open a skill's `SKILL.md` in `$EDITOR` and validate frontmatter on save |
 | `skillctl search <query>` | Search library skills by name, description, `@group`, or match rules |
 | `skillctl info <skill>` | Show metadata, rules, upstream source, and tracked project usage for a skill |
+| `skillctl group list\|add\|rm` | Create and manage `@group` bundles in `index.yaml` |
 | `skillctl global list\|add\|rm\|sync` | Manage global skills in `~/.agents/skills` (plus `~/.claude/skills` and `~/.gemini/config/skills` if enabled) |
 | `skillctl raycast use\|clear\|add\|rm\|status` | Switch active project or pin skills in `~/.config/raycast/skills` (macOS) |
 | `skillctl install <source>` | Import skill(s) from GitHub (`owner/repo`, git URL) or a local folder into library (records upstream `source`) |
 | `skillctl update [skills...]` | Re-pull installed skill(s) from their recorded upstream source in `index.yaml` |
 | `skillctl migrate` | Import existing skills from `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codegpt/skills` |
 | `skillctl doctor [--fix]` | Check/repair broken symlinks, duplicates, legacy `~/.cursor/skills` copies, invalid `SKILL.md`, and copy drift |
+| `skillctl completion <zsh\|bash\|fish>` | Print dynamic shell autocompletion script for subcommands, skills, and `@groups` |
 
 ## Library Layout & `index.yaml`
 

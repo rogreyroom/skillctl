@@ -2,6 +2,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { generateCompletionScript } from "../src/commands/completion.js";
+import { runGroupAddCommand, runGroupRmCommand } from "../src/commands/group.js";
 import {
   runInstallCommand,
   runUpdateCommand,
@@ -627,5 +629,31 @@ describe("skillctl core", () => {
       "utf8",
     );
     expect(syncedMd).toContain("Upstream v2");
+  });
+
+  it("manages @group bundles via group add/rm and generates shell completion scripts", async () => {
+    await writeSkill(libraryPath, "nuxt-api", "nuxt-api");
+    await writeSkill(libraryPath, "nuxt-ui", "nuxt-ui");
+
+    const config = createDefaultConfig();
+    config.libraryPath = libraryPath;
+    await saveConfig(config);
+
+    await runGroupAddCommand("nuxt", ["nuxt-api", "nuxt-ui"]);
+    let index = await loadLibraryIndex(libraryPath);
+    expect(index.groups?.nuxt).toEqual(["nuxt-api", "nuxt-ui"]);
+
+    await runGroupRmCommand("nuxt", ["nuxt-api"]);
+    index = await loadLibraryIndex(libraryPath);
+    expect(index.groups?.nuxt).toEqual(["nuxt-ui"]);
+
+    await runGroupRmCommand("nuxt", []);
+    index = await loadLibraryIndex(libraryPath);
+    expect(index.groups?.nuxt).toBeUndefined();
+
+    expect(generateCompletionScript("zsh")).toContain("compdef _skillctl skillctl");
+    expect(generateCompletionScript("bash")).toContain("_skillctl_completions");
+    expect(generateCompletionScript("fish")).toContain("complete -c skillctl");
+    expect(generateCompletionScript("invalid")).toBeNull();
   });
 });
