@@ -1,8 +1,35 @@
 {
   "name": "skillctl",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Manage global, per-project, and Raycast AI agent skills from a central library",
+  "license": "MIT",
+  "author": "Robert <git@adamczewski.me>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rogreyroom/skillctl.git"
+  },
+  "homepage": "https://github.com/rogreyroom/skillctl#readme",
+  "bugs": {
+    "url": "https://github.com/rogreyroom/skillctl/issues"
+  },
+  "keywords": [
+    "ai",
+    "skills",
+    "agent-skills",
+    "cursor",
+    "claude-code",
+    "codex",
+    "raycast",
+    "antigravity",
+    "cli",
+    "dotfiles"
+  ],
   "type": "module",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
     "skillctl": "./dist/cli.js"
   },

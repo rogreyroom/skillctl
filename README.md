@@ -36,7 +36,7 @@ Works out of the box inside WSL with Node 20+:
 ## Installation
 
 ```bash
-git clone <your-repo-url> skillctl
+git clone https://github.com/rogreyroom/skillctl.git
 cd skillctl
 pnpm install
 pnpm build
@@ -109,13 +109,17 @@ Run `skillctl --help` or `skillctl <command> --help` for all flags.
 | `skillctl init` | Scan project, capture unknown local skills, suggest matches, and sync |
 | `skillctl add [skills...]` | Add skill(s) to current project (`--link` personal / `--copy` shared) |
 | `skillctl rm [skills...]` | Remove skill(s) from current project |
-| `skillctl sync` | Rebuild symlinks/copies from `.skillctl.json` and `.skillctl.local.json` (auto-inherits local manifest in git worktrees) |
+| `skillctl sync` | Rebuild symlinks/copies from `.skillctl.json` and `.skillctl.local.json` (`--all` for all tracked projects; auto-inherits local manifest in git worktrees) |
 | `skillctl list` (`ls`) | List all library skills (`-p, --project` to show only skills active in the current project) |
-| `skillctl global list\|add\|rm\|sync` | Manage global skills in `~/.agents/skills` (and `~/.claude/skills` if enabled) |
+| `skillctl new <name>` | Scaffold a new kebab-case skill with Raycast-valid `SKILL.md` frontmatter and optional match rules |
+| `skillctl search <query>` | Search library skills by name, description, `@group`, or match rules |
+| `skillctl info <skill>` | Show metadata, rules, upstream source, and tracked project usage for a skill |
+| `skillctl global list\|add\|rm\|sync` | Manage global skills in `~/.agents/skills` (plus `~/.claude/skills` and `~/.gemini/config/skills` if enabled) |
 | `skillctl raycast use\|clear\|add\|rm\|status` | Switch active project or pin skills in `~/.config/raycast/skills` (macOS) |
-| `skillctl install <source>` | Import skill(s) from GitHub (`owner/repo`, git URL) or a local folder into library |
+| `skillctl install <source>` | Import skill(s) from GitHub (`owner/repo`, git URL) or a local folder into library (records upstream `source`) |
+| `skillctl update [skills...]` | Re-pull installed skill(s) from their recorded upstream source in `index.yaml` |
 | `skillctl migrate` | Import existing skills from `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codegpt/skills` |
-| `skillctl doctor [--fix]` | Check/repair broken symlinks, duplicates, invalid `SKILL.md` files, and copy drift |
+| `skillctl doctor [--fix]` | Check/repair broken symlinks, duplicates, legacy `~/.cursor/skills` copies, invalid `SKILL.md`, and copy drift |
 
 ## Library Layout & `index.yaml`
 
@@ -139,6 +143,12 @@ Example `index.yaml`:
 global:
   - find-skills
 
+groups:
+  nuxt:
+    - nuxt-api-development
+    - nuxt-component-development
+    - drizzle-migration-review
+
 skills:
   vitest:
     match:
@@ -157,6 +167,8 @@ skills:
       files: [composer.json, artisan]
 ```
 
+Use groups anywhere skills are accepted (e.g. `skillctl add @nuxt`, `skillctl rm @nuxt`, `skillctl raycast add @nuxt`).
+
 ## Development
 
 ```bash
@@ -164,3 +176,7 @@ pnpm build       # compile TypeScript to dist/
 pnpm test        # run Vitest test suite
 pnpm typecheck   # type-check without emitting
 ```
+
+## License
+
+[MIT](./LICENSE)
