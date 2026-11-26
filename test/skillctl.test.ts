@@ -2,7 +2,19 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runListCommand } from "../src/commands/project.js";
+import {
+  runInstallCommand,
+  runUpdateCommand,
+} from "../src/commands/install.js";
+import {
+  runInfoCommand,
+  runNewSkillCommand,
+  runSearchCommand,
+} from "../src/commands/library.js";
+import {
+  runListCommand,
+  runProjectSyncCommand,
+} from "../src/commands/project.js";
 import {
   createDefaultConfig,
   loadMergedProjectManifest,
@@ -20,9 +32,11 @@ import {
 import {
   discoverProjectUnmanagedSkills,
   ensureLibraryScaffold,
+  expandSkillTargets,
   importSkillDirToLibrary,
   inspectSkillDir,
   listLibrarySkills,
+  loadLibraryIndex,
   saveLibraryIndex,
 } from "../src/library.js";
 import {
@@ -517,5 +531,101 @@ describe("skillctl core", () => {
     );
     expect(excludeContent).toContain(".skillctl.local.json");
     expect(excludeContent).toContain(".agents/skills/vitest");
+  });
+
+  it("expands @group targets from index.yaml", () => {
+    const index = {
+      global: [],
+      groups: {
+        nuxt: ["nuxt-api", "nuxt-ui"],
+      },
+      skills: {},
+    };
+    const res = expandSkillTargets(["@nuxt", "vitest", "@missing"], index);
+    expect(res.resolved).toEqual(["nuxt-api", "nuxt-ui", "vitest"]);
+    expect(res.unknownGroups).toEqual(["@missing"]);
+  });
+
+  it("scaffolds a new skill, searches for it, and displays info", async () => {
+    const config = createDefaultConfig();
+    config.libraryPath = libraryPath;
+    await saveConfig(config);
+
+    await runNewSkillCommand("my-custom-skill", {
+      description: "Use when testing skillctl new.",
+      deps: "vitest,zod",
+      files: "vitest.config.*",
+    });
+
+    const info = await inspectSkillDir(
+      path.join(getLibrarySkillsDir(libraryPath), "my-custom-skill"),
+    );
+    expect(info.issues).toEqual([]);
+    expect(info.frontmatterName).toBe("my-custom-skill");
+
+    const index = await loadLibraryIndex(libraryPath);
+    expect(index.skills["my-custom-skill"]?.match?.deps).toEqual([
+      "vitest",
+      "zod",
+    ]);
+
+    const lines: string[] = [];
+    const spy = vi
+      .spyOn(console, "log")
+      .mockImplementation((...args: unknown[]) => {
+        lines.push(args.map(String).join(" "));
+      });
+    try {
+      await runSearchCommand("zod");
+      await runInfoCommand("my-custom-skill");
+    } finally {
+      spy.mockRestore();
+    }
+
+    const out = lines.join("\n");
+    expect(out).toContain("my-custom-skill");
+    expect(out).toContain("Use when testing skillctl new.");
+  });
+
+  it("records source on install, updates from source, and syncs all tracked projects", async () => {
+    const config = createDefaultConfig();
+    config.libraryPath = libraryPath;
+    config.trackedProjects = [projectDir];
+    await saveConfig(config);
+
+    // Local upstream source folder
+    const upstreamDir = path.join(tmpHome, "upstream", "cool-skill");
+    await fs.mkdir(upstreamDir, { recursive: true });
+    await fs.writeFile(
+      path.join(upstreamDir, "SKILL.md"),
+      "---\nname: cool-skill\ndescription: Upstream v1\n---\n\n# v1\n",
+      "utf8",
+    );
+
+    await runInstallCommand(upstreamDir, {});
+    const index = await loadLibraryIndex(libraryPath);
+    expect(index.skills["cool-skill"]?.source).toBe(path.resolve(upstreamDir));
+
+    // Add as copy in tracked project
+    await saveProjectManifest(projectDir, {
+      skills: { "cool-skill": { mode: "copy" } },
+    });
+    await syncProject(projectDir, config);
+
+    // Update upstream to v2
+    await fs.writeFile(
+      path.join(upstreamDir, "SKILL.md"),
+      "---\nname: cool-skill\ndescription: Upstream v2\n---\n\n# v2\n",
+      "utf8",
+    );
+
+    await runUpdateCommand(["cool-skill"]);
+    await runProjectSyncCommand({ all: true });
+
+    const syncedMd = await fs.readFile(
+      path.join(getProjectAgentsSkillsDir(projectDir), "cool-skill", "SKILL.md"),
+      "utf8",
+    );
+    expect(syncedMd).toContain("Upstream v2");
   });
 });

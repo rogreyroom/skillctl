@@ -9,6 +9,7 @@ import {
 } from "../config.js";
 import { findProjectDuplicates } from "../duplicates.js";
 import {
+  expandSkillTargets,
   listLibrarySkills,
   loadLibraryIndex,
   saveLibraryIndex,
@@ -76,6 +77,18 @@ export async function runGlobalAddCommand(
       return;
     }
     targets = chosen as string[];
+  } else {
+    const expanded = expandSkillTargets(targets, index);
+    if (expanded.unknownGroups.length > 0) {
+      console.error(
+        pc.red(
+          `Unknown skill group(s) in index.yaml: ${expanded.unknownGroups.join(", ")}`,
+        ),
+      );
+      process.exitCode = 1;
+      return;
+    }
+    targets = expanded.resolved;
   }
 
   const missing = targets.filter((n) => !availableNames.has(n));
@@ -179,6 +192,18 @@ export async function runGlobalRmCommand(skillNames: string[]): Promise<void> {
       return;
     }
     targets = chosen as string[];
+  } else {
+    const expanded = expandSkillTargets(targets, index);
+    if (expanded.unknownGroups.length > 0) {
+      console.error(
+        pc.red(
+          `Unknown skill group(s) in index.yaml: ${expanded.unknownGroups.join(", ")}`,
+        ),
+      );
+      process.exitCode = 1;
+      return;
+    }
+    targets = expanded.resolved;
   }
 
   const removeSet = new Set(targets);

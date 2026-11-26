@@ -12,6 +12,7 @@ import {
 import { findGlobalDuplicates } from "../duplicates.js";
 import {
   discoverProjectUnmanagedSkills,
+  expandSkillTargets,
   listLibrarySkills,
   loadLibraryIndex,
 } from "../library.js";
@@ -71,6 +72,18 @@ export async function runProjectAddCommand(
       return;
     }
     targets = chosen as string[];
+  } else {
+    const expanded = expandSkillTargets(targets, index);
+    if (expanded.unknownGroups.length > 0) {
+      console.error(
+        pc.red(
+          `Unknown skill group(s) in index.yaml: ${expanded.unknownGroups.join(", ")}`,
+        ),
+      );
+      process.exitCode = 1;
+      return;
+    }
+    targets = expanded.resolved;
   }
 
   const missing = targets.filter((n) => !availableNames.has(n));
@@ -159,6 +172,7 @@ export async function runProjectRmCommand(
     return;
   }
 
+  const index = await loadLibraryIndex(config.libraryPath);
   let targets = skillNames;
   if (targets.length === 0) {
     const chosen = await p.multiselect({
@@ -174,6 +188,18 @@ export async function runProjectRmCommand(
       return;
     }
     targets = chosen as string[];
+  } else {
+    const expanded = expandSkillTargets(targets, index);
+    if (expanded.unknownGroups.length > 0) {
+      console.error(
+        pc.red(
+          `Unknown skill group(s) in index.yaml: ${expanded.unknownGroups.join(", ")}`,
+        ),
+      );
+      process.exitCode = 1;
+      return;
+    }
+    targets = expanded.resolved;
   }
 
   const useClaude = existing.merged.claude ?? config.agents.claude;
@@ -215,9 +241,34 @@ export async function runProjectRmCommand(
 
 export async function runProjectSyncCommand(options: {
   dir?: string;
+  all?: boolean;
 }): Promise<void> {
-  const projectDir = path.resolve(options.dir ?? process.cwd());
   const config = await loadConfig();
+
+  if (options.all) {
+    if (config.trackedProjects.length === 0) {
+      console.log(pc.yellow("No tracked projects to sync."));
+      return;
+    }
+    let syncedCount = 0;
+    for (const dir of config.trackedProjects) {
+      if (!(await pathExists(dir))) {
+        console.log(pc.yellow(`Skipping missing directory: ${dir}`));
+        continue;
+      }
+      const { merged } = await loadMergedProjectManifest(dir);
+      if (!merged) continue;
+      const result = await syncProject(dir, config);
+      syncedCount++;
+      console.log(
+        `${pc.green("✓")} ${pc.bold(path.basename(dir))} ${pc.dim(`(${dir})`)}: ${result.linked.length} linked, ${result.copied.length} copied, ${result.removed.length} removed`,
+      );
+    }
+    console.log(pc.cyan(`Synced ${syncedCount} tracked project(s).`));
+    return;
+  }
+
+  const projectDir = path.resolve(options.dir ?? process.cwd());
   let existing = await loadMergedProjectManifest(projectDir);
 
   // If running in a linked git worktree without .skillctl.local.json, inherit it from the main worktree

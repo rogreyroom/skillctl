@@ -15,7 +15,42 @@ import type {
   SkillValidationIssue,
 } from "./types.js";
 
-const KEBAB_CASE_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const KEBAB_CASE_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function isValidSkillName(name: string): boolean {
+  return KEBAB_CASE_RE.test(name);
+}
+
+export function expandSkillTargets(
+  targets: string[],
+  index: LibraryIndex,
+): { resolved: string[]; unknownGroups: string[] } {
+  const resolved: string[] = [];
+  const unknownGroups: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of targets) {
+    if (raw.startsWith("@")) {
+      const groupName = raw.slice(1);
+      const members = index.groups?.[groupName];
+      if (!members || members.length === 0) {
+        unknownGroups.push(raw);
+        continue;
+      }
+      for (const m of members) {
+        if (!seen.has(m)) {
+          seen.add(m);
+          resolved.push(m);
+        }
+      }
+    } else if (!seen.has(raw)) {
+      seen.add(raw);
+      resolved.push(raw);
+    }
+  }
+
+  return { resolved, unknownGroups };
+}
 
 export function createStarterIndex(): LibraryIndex {
   return {
@@ -50,10 +85,19 @@ export async function loadLibraryIndex(
   try {
     const raw = await fs.readFile(indexPath, "utf8");
     const parsed = (YAML.parse(raw) ?? {}) as Partial<LibraryIndex>;
+    const groups: Record<string, string[]> = {};
+    if (parsed.groups && typeof parsed.groups === "object") {
+      for (const [k, v] of Object.entries(parsed.groups)) {
+        if (Array.isArray(v)) {
+          groups[k] = [...new Set(v.map(String))];
+        }
+      }
+    }
     return {
       global: Array.isArray(parsed.global)
         ? [...new Set(parsed.global.map(String))]
         : [],
+      ...(Object.keys(groups).length > 0 ? { groups } : {}),
       skills:
         parsed.skills && typeof parsed.skills === "object"
           ? parsed.skills
@@ -71,8 +115,17 @@ export async function saveLibraryIndex(
   await fs.mkdir(path.dirname(getLibraryIndexPath(libraryPath)), {
     recursive: true,
   });
+  const sortedGroups =
+    index.groups && Object.keys(index.groups).length > 0
+      ? Object.fromEntries(
+          Object.entries(index.groups)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, v]) => [k, [...new Set(v)].sort()]),
+        )
+      : undefined;
   const normalized: LibraryIndex = {
     global: [...new Set(index.global)].sort(),
+    ...(sortedGroups ? { groups: sortedGroups } : {}),
     skills: Object.fromEntries(
       Object.entries(index.skills).sort(([a], [b]) => a.localeCompare(b)),
     ),

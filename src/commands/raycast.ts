@@ -5,7 +5,11 @@ import {
   loadMergedProjectManifest,
   saveConfig,
 } from "../config.js";
-import { listLibrarySkills, loadLibraryIndex } from "../library.js";
+import {
+  expandSkillTargets,
+  listLibrarySkills,
+  loadLibraryIndex,
+} from "../library.js";
 import { syncRaycast } from "../linker.js";
 import { getRaycastSkillsDir } from "../paths.js";
 
@@ -75,7 +79,19 @@ export async function runRaycastAddCommand(
   const available = new Set(librarySkills.map((s) => s.name));
   const globalSet = new Set(index.global);
 
-  const missing = skillNames.filter((n) => !available.has(n));
+  const expanded = expandSkillTargets(skillNames, index);
+  if (expanded.unknownGroups.length > 0) {
+    console.error(
+      pc.red(
+        `Unknown skill group(s) in index.yaml: ${expanded.unknownGroups.join(", ")}`,
+      ),
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const targets = expanded.resolved;
+
+  const missing = targets.filter((n) => !available.has(n));
   if (missing.length > 0) {
     console.error(
       pc.red(`Unknown skill(s) not in library: ${missing.join(", ")}`),
@@ -84,7 +100,7 @@ export async function runRaycastAddCommand(
     return;
   }
 
-  for (const name of skillNames) {
+  for (const name of targets) {
     if (globalSet.has(name)) {
       console.log(
         pc.yellow(

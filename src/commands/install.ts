@@ -5,7 +5,12 @@ import path from "node:path";
 import { promisify } from "node:util";
 import pc from "picocolors";
 import { loadConfig } from "../config.js";
-import { ensureLibraryScaffold, inspectSkillDir } from "../library.js";
+import {
+  ensureLibraryScaffold,
+  inspectSkillDir,
+  loadLibraryIndex,
+  saveLibraryIndex,
+} from "../library.js";
 import {
   getGlobalAgentsSkillsDir,
   getGlobalClaudeSkillsDir,
@@ -132,6 +137,15 @@ export async function runInstallCommand(
     }
 
     if (installed.length > 0) {
+      const index = await loadLibraryIndex(config.libraryPath);
+      const recordedSource = isLocal ? path.resolve(source) : source;
+      for (const skillName of installed) {
+        index.skills[skillName] = {
+          ...(index.skills[skillName] ?? {}),
+          source: recordedSource,
+        };
+      }
+      await saveLibraryIndex(config.libraryPath, index);
       console.log(
         pc.green(
           `Installed ${installed.length} skill(s) into library: ${installed.join(", ")}`,
@@ -149,6 +163,109 @@ export async function runInstallCommand(
     if (tempDir) {
       await fs.rm(tempDir, { recursive: true, force: true });
     }
+  }
+}
+
+export async function runUpdateCommand(skillNames: string[]): Promise<void> {
+  const config = await loadConfig();
+  const index = await loadLibraryIndex(config.libraryPath);
+
+  const candidates =
+    skillNames.length > 0
+      ? skillNames
+      : Object.entries(index.skills)
+          .filter(([, entry]) => Boolean(entry.source))
+          .map(([name]) => name);
+
+  if (candidates.length === 0) {
+    console.log(
+      pc.yellow(
+        "No skills with a tracked upstream source in index.yaml. Install remote skills with `skillctl install <owner/repo>` first.",
+      ),
+    );
+    return;
+  }
+
+  // Group requested skills by source so each repo is fetched only once
+  const bySource = new Map<string, string[]>();
+  const noSource: string[] = [];
+  for (const name of candidates) {
+    const src = index.skills[name]?.source;
+    if (!src) {
+      noSource.push(name);
+      continue;
+    }
+    const list = bySource.get(src) ?? [];
+    list.push(name);
+    bySource.set(src, list);
+  }
+
+  if (noSource.length > 0) {
+    console.log(
+      pc.yellow(`No upstream source recorded for: ${noSource.join(", ")}`),
+    );
+  }
+
+  const librarySkillsDir = getLibrarySkillsDir(config.libraryPath);
+  const updated: string[] = [];
+
+  for (const [source, wanted] of bySource) {
+    let searchRoot = path.resolve(source);
+    let tempDir: string | null = null;
+    try {
+      let isLocal = false;
+      try {
+        await fs.access(searchRoot);
+        isLocal = true;
+      } catch {
+        isLocal = false;
+      }
+
+      if (!isLocal) {
+        const repoUrl = normalizeRepoUrl(source);
+        if (!repoUrl) {
+          console.error(pc.red(`Invalid source "${source}", skipping.`));
+          continue;
+        }
+        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "skillctl-update-"));
+        console.log(pc.dim(`Updating from ${repoUrl}...`));
+        await execFileAsync("git", ["clone", "--depth", "1", repoUrl, tempDir]);
+        searchRoot = tempDir;
+      }
+
+      const skillDirs = await findSkillDirsRecursive(searchRoot);
+      const wantedSet = new Set(wanted);
+
+      for (const dir of skillDirs) {
+        const info = await inspectSkillDir(dir);
+        const name = info.frontmatterName || info.name;
+        if (!wantedSet.has(name)) continue;
+
+        const destDir = path.join(librarySkillsDir, name);
+        await fs.rm(destDir, { recursive: true, force: true });
+        await fs.cp(dir, destDir, { recursive: true });
+        updated.push(name);
+      }
+    } finally {
+      if (tempDir) {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      }
+    }
+  }
+
+  if (updated.length > 0) {
+    console.log(
+      pc.green(
+        `Updated ${updated.length} skill(s): ${updated.sort().join(", ")}`,
+      ),
+    );
+    console.log(
+      pc.dim(
+        "Tip: run `skillctl sync --all` if any projects use --copy mode for these skills.",
+      ),
+    );
+  } else {
+    console.log(pc.yellow("No skills were updated."));
   }
 }
 

@@ -8,7 +8,16 @@ import {
   runGlobalSyncCommand,
 } from "./commands/global.js";
 import { runInitCommand } from "./commands/init.js";
-import { runInstallCommand, runMigrateCommand } from "./commands/install.js";
+import {
+  runInstallCommand,
+  runMigrateCommand,
+  runUpdateCommand,
+} from "./commands/install.js";
+import {
+  runInfoCommand,
+  runNewSkillCommand,
+  runSearchCommand,
+} from "./commands/library.js";
 import {
   runListCommand,
   runProjectAddCommand,
@@ -32,7 +41,7 @@ program
   .description(
     "Manage global, per-project, and Raycast AI agent skills from a central library",
   )
-  .version("0.1.0");
+  .version("0.2.0");
 
 program
   .command("setup")
@@ -80,8 +89,28 @@ program
 program
   .command("sync")
   .description("Rebuild project skill symlinks/copies from .skillctl.json and .skillctl.local.json")
+  .option("-a, --all", "Sync all tracked projects")
   .option("--dir <path>", "Target project directory")
   .action(runProjectSyncCommand);
+
+program
+  .command("new <name>")
+  .description("Scaffold a new kebab-case skill in your central library")
+  .option("-d, --description <text>", 'Skill description (start with "Use when...")')
+  .option("--deps <list>", "Comma-separated dependency match rules (e.g. nuxt,vitest)")
+  .option("--files <list>", "Comma-separated file match rules (e.g. nuxt.config.*)")
+  .option("-g, --global", "Also enable the new skill globally")
+  .action(runNewSkillCommand);
+
+program
+  .command("search <query>")
+  .description("Search library skills by name, description, group, or match rules")
+  .action(runSearchCommand);
+
+program
+  .command("info <skill>")
+  .description("Show details, rules, and tracked project usage for a skill")
+  .action(runInfoCommand);
 
 program
   .command("list")
@@ -156,6 +185,11 @@ program
   .action(runInstallCommand);
 
 program
+  .command("update [skills...]")
+  .description("Re-pull installed skill(s) from their recorded upstream source in index.yaml")
+  .action(runUpdateCommand);
+
+program
   .command("migrate")
   .description("Import existing skills from ~/.agents, ~/.claude, ~/.cursor, and ~/.codegpt into library")
   .option("--overwrite", "Overwrite existing skills with the same name")
@@ -177,7 +211,12 @@ Examples:
   $ skillctl init                      Detect project stack & link/copy matching skills
   $ skillctl add vitest                Add personal skill (.skillctl.local.json, git-excluded)
   $ skillctl add vitest --copy         Add shared skill (.skillctl.json, committed to repo)
+  $ skillctl add @nuxt                 Add all skills in the "nuxt" group from index.yaml
+  $ skillctl new my-skill              Scaffold a new Raycast-valid skill in your library
+  $ skillctl search nuxt               Search library skills by keyword or group
   $ skillctl list --project            Verify all skills active in the current project
+  $ skillctl sync --all                Re-sync all tracked projects
+  $ skillctl update                    Update remotely installed skills from upstream
   $ skillctl raycast use               Expose current project's skills to Raycast
   $ skillctl doctor --fix              Find and auto-repair broken links, duplicates, or drift
 `,

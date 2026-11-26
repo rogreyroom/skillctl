@@ -22,10 +22,12 @@ export interface SkillIndexEntry {
   match?: SkillMatchRule;
   defaultMode?: InstallMode;
   description?: string;
+  source?: string;
 }
 
 export interface LibraryIndex {
   global: string[];
+  groups?: Record<string, string[]>;
   skills: Record<string, SkillIndexEntry>;
 }
 
