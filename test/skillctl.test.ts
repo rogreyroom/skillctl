@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runListCommand } from "../src/commands/project.js";
 import {
   createDefaultConfig,
   loadMergedProjectManifest,
@@ -24,10 +25,17 @@ import {
   listLibrarySkills,
   saveLibraryIndex,
 } from "../src/library.js";
-import { syncGlobal, syncProject, syncRaycast } from "../src/linker.js";
+import {
+  resolveGitInfo,
+  syncGlobal,
+  syncProject,
+  syncRaycast,
+} from "../src/linker.js";
 import {
   getGlobalAgentsSkillsDir,
+  getGlobalAntigravitySkillsDir,
   getGlobalClaudeSkillsDir,
+  getGlobalCursorSkillsDir,
   getLibrarySkillsDir,
   getProjectAgentsSkillsDir,
   getProjectClaudeSkillsDir,
@@ -373,5 +381,141 @@ describe("skillctl core", () => {
     await importSkillDirToLibrary(projSkillDir, libraryPath, "repo-only-skill");
     const afterImport = await discoverProjectUnmanagedSkills(projectDir, libraryPath);
     expect(afterImport.map((u) => u.name)).toEqual(["cursor-only-skill"]);
+  });
+
+  it("list --project shows only active project, unmanaged, and global skills", async () => {
+    await writeSkill(libraryPath, "global-skill", "global-skill");
+    await writeSkill(libraryPath, "shared-skill", "shared-skill");
+    await writeSkill(libraryPath, "personal-skill", "personal-skill");
+    await writeSkill(libraryPath, "unused-lib-skill", "unused-lib-skill");
+
+    const config = createDefaultConfig();
+    config.libraryPath = libraryPath;
+    await saveConfig(config);
+    await saveLibraryIndex(libraryPath, {
+      global: ["global-skill"],
+      skills: {},
+    });
+
+    await saveProjectManifest(projectDir, {
+      skills: { "shared-skill": { mode: "copy" } },
+    });
+    await saveProjectLocalManifest(projectDir, {
+      skills: { "personal-skill": { mode: "link" } },
+      gitExclude: true,
+    });
+    await syncProject(projectDir, config);
+
+    const unmanagedDir = path.join(projectDir, ".agents", "skills", "custom-local");
+    await fs.mkdir(unmanagedDir, { recursive: true });
+    await fs.writeFile(
+      path.join(unmanagedDir, "SKILL.md"),
+      "---\nname: custom-local\ndescription: Unmanaged skill\n---\n\n# Custom\n",
+      "utf8",
+    );
+
+    const lines: string[] = [];
+    const spy = vi
+      .spyOn(console, "log")
+      .mockImplementation((...args: unknown[]) => {
+        lines.push(args.map(String).join(" "));
+      });
+
+    try {
+      await runListCommand({ dir: projectDir, project: true });
+    } finally {
+      spy.mockRestore();
+    }
+
+    const output = lines.join("\n");
+    expect(output).toContain("shared-skill");
+    expect(output).toContain("repo:copy");
+    expect(output).toContain("personal-skill");
+    expect(output).toContain("local:link");
+    expect(output).toContain("custom-local");
+    expect(output).toContain("unmanaged:");
+    expect(output).toContain("global-skill");
+    expect(output).not.toContain("unused-lib-skill");
+  });
+
+  it("syncs global skills to Antigravity (~/.gemini/config/skills) when enabled", async () => {
+    await writeSkill(libraryPath, "find-skills", "find-skills");
+    const config = createDefaultConfig();
+    config.libraryPath = libraryPath;
+    config.agents.antigravity = true;
+    await saveConfig(config);
+
+    await syncGlobal(config, { global: ["find-skills"], skills: {} });
+    const agyLink = await fs.lstat(
+      path.join(getGlobalAntigravitySkillsDir(), "find-skills"),
+    );
+    expect(agyLink.isSymbolicLink()).toBe(true);
+  });
+
+  it("doctor detects and fixes legacy duplicates in ~/.cursor/skills and unmanaged ~/.agents/skills copies", async () => {
+    await writeSkill(libraryPath, "vitest", "vitest");
+    await writeSkill(libraryPath, "nuxt-code-review", "nuxt-code-review");
+
+    const config = createDefaultConfig();
+    config.libraryPath = libraryPath;
+    await saveConfig(config);
+    await saveLibraryIndex(libraryPath, { global: [], skills: {} });
+
+    // Simulate legacy copy in ~/.cursor/skills and unmanaged copy in ~/.agents/skills
+    const legacyCursor = path.join(getGlobalCursorSkillsDir(), "nuxt-code-review");
+    await fs.mkdir(legacyCursor, { recursive: true });
+    await fs.writeFile(path.join(legacyCursor, "SKILL.md"), "old", "utf8");
+
+    const legacyAgents = path.join(getGlobalAgentsSkillsDir(), "vitest");
+    await fs.mkdir(legacyAgents, { recursive: true });
+    await fs.writeFile(path.join(legacyAgents, "SKILL.md"), "old", "utf8");
+
+    const issues = await runDoctor(config);
+    const codes = issues.map((i) => i.code);
+    expect(codes).toContain("legacy-cursor-duplicate");
+    expect(codes).toContain("legacy-global-copy");
+
+    for (const issue of issues) {
+      if (issue.fixable && issue.fix) await issue.fix();
+    }
+
+    await expect(fs.lstat(legacyCursor)).rejects.toThrow();
+    await expect(fs.lstat(legacyAgents)).rejects.toThrow();
+  });
+
+  it("resolves git worktree .git files and writes excludes to common git dir", async () => {
+    await writeSkill(libraryPath, "vitest", "vitest");
+
+    // Simulate a linked worktree pointing to projectDir/.git/worktrees/wt-1
+    const wtGitDir = path.join(projectDir, ".git", "worktrees", "wt-1");
+    await fs.mkdir(wtGitDir, { recursive: true });
+    await fs.writeFile(path.join(wtGitDir, "commondir"), "../..\n", "utf8");
+
+    const worktreeDir = path.join(tmpHome, "projects", "demo-app-wt1");
+    await fs.mkdir(worktreeDir, { recursive: true });
+    await fs.writeFile(
+      path.join(worktreeDir, ".git"),
+      `gitdir: ${wtGitDir}\n`,
+      "utf8",
+    );
+
+    const gitInfo = await resolveGitInfo(worktreeDir);
+    expect(gitInfo?.isWorktree).toBe(true);
+    expect(gitInfo?.mainWorktreeDir).toBe(path.resolve(projectDir));
+
+    const config = createDefaultConfig();
+    config.libraryPath = libraryPath;
+    await saveProjectLocalManifest(worktreeDir, {
+      skills: { vitest: { mode: "link" } },
+      gitExclude: true,
+    });
+    await syncProject(worktreeDir, config);
+
+    const excludeContent = await fs.readFile(
+      path.join(projectDir, ".git", "info", "exclude"),
+      "utf8",
+    );
+    expect(excludeContent).toContain(".skillctl.local.json");
+    expect(excludeContent).toContain(".agents/skills/vitest");
   });
 });

@@ -8,6 +8,7 @@ import {
 import { computeDirHash } from "./library.js";
 import {
   getGlobalAgentsSkillsDir,
+  getGlobalAntigravitySkillsDir,
   getGlobalClaudeSkillsDir,
   getLibrarySkillsDir,
   getProjectAgentsSkillsDir,
@@ -150,6 +151,9 @@ export async function syncGlobal(
   if (config.agents.claude) {
     targets.push(getGlobalClaudeSkillsDir());
   }
+  if (config.agents.antigravity) {
+    targets.push(getGlobalAntigravitySkillsDir());
+  }
 
   const desired = new Set(index.global);
   const linked = new Set<string>();
@@ -185,19 +189,77 @@ export async function syncGlobal(
   };
 }
 
+export interface GitRepoInfo {
+  isWorktree: boolean;
+  gitDir: string;
+  commonGitDir: string;
+  mainWorktreeDir: string;
+}
+
+export async function resolveGitInfo(
+  projectDir: string,
+): Promise<GitRepoInfo | null> {
+  const dotGit = path.join(projectDir, ".git");
+  let stat;
+  try {
+    stat = await fs.stat(dotGit);
+  } catch {
+    return null;
+  }
+
+  if (stat.isDirectory()) {
+    return {
+      isWorktree: false,
+      gitDir: dotGit,
+      commonGitDir: dotGit,
+      mainWorktreeDir: path.resolve(projectDir),
+    };
+  }
+
+  if (stat.isFile()) {
+    try {
+      const content = await fs.readFile(dotGit, "utf8");
+      const match = content.match(/^gitdir:\s*(.+)$/m);
+      if (!match?.[1]) return null;
+      const gitDir = path.resolve(projectDir, match[1].trim());
+      let commonGitDir = gitDir;
+      try {
+        const commondirRaw = await fs.readFile(
+          path.join(gitDir, "commondir"),
+          "utf8",
+        );
+        if (commondirRaw.trim()) {
+          commonGitDir = path.resolve(gitDir, commondirRaw.trim());
+        }
+      } catch {
+        // Not a linked worktree or no commondir file
+      }
+      const mainWorktreeDir =
+        path.basename(commonGitDir) === ".git"
+          ? path.dirname(commonGitDir)
+          : path.resolve(projectDir);
+      return {
+        isWorktree: commonGitDir !== gitDir,
+        gitDir,
+        commonGitDir,
+        mainWorktreeDir,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 export async function syncGitExclude(
   projectDir: string,
   patterns: string[],
 ): Promise<boolean> {
-  const gitDir = path.join(projectDir, ".git");
-  try {
-    const stat = await fs.stat(gitDir);
-    if (!stat.isDirectory()) return false;
-  } catch {
-    return false;
-  }
+  const gitInfo = await resolveGitInfo(projectDir);
+  if (!gitInfo) return false;
 
-  const excludePath = path.join(gitDir, "info", "exclude");
+  const excludePath = path.join(gitInfo.commonGitDir, "info", "exclude");
   await fs.mkdir(path.dirname(excludePath), { recursive: true });
 
   let existing = "";

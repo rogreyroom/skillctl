@@ -19,7 +19,9 @@ import {
 } from "./linker.js";
 import {
   getGlobalAgentsSkillsDir,
+  getGlobalAntigravitySkillsDir,
   getGlobalClaudeSkillsDir,
+  getGlobalCursorSkillsDir,
   getLibrarySkillsDir,
   getProjectAgentsSkillsDir,
   getProjectClaudeSkillsDir,
@@ -111,10 +113,66 @@ export async function runDoctor(
   if (config.agents.claude) {
     await checkBrokenSymlinks(getGlobalClaudeSkillsDir(), "global", issues);
   }
+  if (config.agents.antigravity) {
+    await checkBrokenSymlinks(
+      getGlobalAntigravitySkillsDir(),
+      "global",
+      issues,
+    );
+  }
+  await checkBrokenSymlinks(getGlobalCursorSkillsDir(), "global", issues);
   await checkBrokenSymlinks(getRaycastSkillsDir(), "raycast", issues);
 
-  // 4. Raycast duplicates with global
+  // 3b. Legacy/stale duplicates in ~/.cursor/skills/ and unmanaged copies in ~/.agents/skills/
   const globalSet = new Set(index.global);
+  try {
+    const cursorDir = getGlobalCursorSkillsDir();
+    const cursorEntries = await fs.readdir(cursorDir, { withFileTypes: true });
+    for (const entry of cursorEntries) {
+      if (entry.name.startsWith(".")) continue;
+      if (!availableNames.has(entry.name)) continue;
+      const dupPath = path.join(cursorDir, entry.name);
+      issues.push({
+        severity: "warn",
+        scope: "global",
+        code: "legacy-cursor-duplicate",
+        message: `Legacy skill "${entry.name}" in ~/.cursor/skills/ duplicates your central library (Cursor already reads ~/.agents/skills/ and .agents/skills/).`,
+        fixable: true,
+        fix: async () => {
+          await fs.rm(dupPath, { recursive: true, force: true });
+        },
+      });
+    }
+  } catch {
+    // ~/.cursor/skills may not exist
+  }
+
+  try {
+    const agentsDir = getGlobalAgentsSkillsDir();
+    const agentsEntries = await fs.readdir(agentsDir, { withFileTypes: true });
+    for (const entry of agentsEntries) {
+      if (entry.name.startsWith(".")) continue;
+      if (globalSet.has(entry.name) || !availableNames.has(entry.name)) continue;
+      const dupPath = path.join(agentsDir, entry.name);
+      const lstat = await fs.lstat(dupPath);
+      if (!lstat.isSymbolicLink() && lstat.isDirectory()) {
+        issues.push({
+          severity: "warn",
+          scope: "global",
+          code: "legacy-global-copy",
+          message: `Unmanaged folder "${entry.name}" in ~/.agents/skills/ duplicates your central library but is not in global.`,
+          fixable: true,
+          fix: async () => {
+            await fs.rm(dupPath, { recursive: true, force: true });
+          },
+        });
+      }
+    }
+  } catch {
+    // ~/.agents/skills may not exist
+  }
+
+  // 4. Raycast duplicates with global
   try {
     const raycastEntries = await fs.readdir(getRaycastSkillsDir());
     for (const name of raycastEntries) {

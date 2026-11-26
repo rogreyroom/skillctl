@@ -38,6 +38,14 @@ export function getGlobalClaudeSkillsDir(): string {
   return path.join(getHomeDir(), ".claude", "skills");
 }
 
+export function getGlobalAntigravitySkillsDir(): string {
+  return path.join(getHomeDir(), ".gemini", "config", "skills");
+}
+
+export function getGlobalCursorSkillsDir(): string {
+  return path.join(getHomeDir(), ".cursor", "skills");
+}
+
 export function getRaycastSkillsDir(): string {
   return path.join(getHomeDir(), ".config", "raycast", "skills");
 }

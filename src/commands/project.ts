@@ -10,9 +10,19 @@ import {
   trackProject,
 } from "../config.js";
 import { findGlobalDuplicates } from "../duplicates.js";
-import { listLibrarySkills, loadLibraryIndex } from "../library.js";
-import { removeProjectSkillFiles, syncProject } from "../linker.js";
 import {
+  discoverProjectUnmanagedSkills,
+  listLibrarySkills,
+  loadLibraryIndex,
+} from "../library.js";
+import {
+  pathExists,
+  removeProjectSkillFiles,
+  resolveGitInfo,
+  syncProject,
+} from "../linker.js";
+import {
+  getProjectAgentsSkillsDir,
   getProjectLocalManifestPath,
   getProjectManifestPath,
 } from "../paths.js";
@@ -208,9 +218,28 @@ export async function runProjectSyncCommand(options: {
 }): Promise<void> {
   const projectDir = path.resolve(options.dir ?? process.cwd());
   const config = await loadConfig();
-  const { merged } = await loadMergedProjectManifest(projectDir);
+  let existing = await loadMergedProjectManifest(projectDir);
 
-  if (!merged) {
+  // If running in a linked git worktree without .skillctl.local.json, inherit it from the main worktree
+  if (!existing.local) {
+    const gitInfo = await resolveGitInfo(projectDir);
+    if (gitInfo?.isWorktree && gitInfo.mainWorktreeDir !== projectDir) {
+      const mainLoaded = await loadMergedProjectManifest(
+        gitInfo.mainWorktreeDir,
+      );
+      if (mainLoaded.local && Object.keys(mainLoaded.local.skills).length > 0) {
+        await saveProjectLocalManifest(projectDir, mainLoaded.local);
+        existing = await loadMergedProjectManifest(projectDir);
+        console.log(
+          pc.dim(
+            `Inherited .skillctl.local.json from main worktree (${gitInfo.mainWorktreeDir}).`,
+          ),
+        );
+      }
+    }
+  }
+
+  if (!existing.merged) {
     console.log(
       pc.yellow(
         `No .skillctl.json or .skillctl.local.json found in ${projectDir}. Run \`skillctl init\` first.`,
@@ -234,40 +263,119 @@ export async function runProjectSyncCommand(options: {
   }
 }
 
-export async function runListCommand(options: { dir?: string }): Promise<void> {
+export async function runListCommand(options: {
+  dir?: string;
+  project?: boolean;
+}): Promise<void> {
   const projectDir = path.resolve(options.dir ?? process.cwd());
   const config = await loadConfig();
   const index = await loadLibraryIndex(config.libraryPath);
   const librarySkills = await listLibrarySkills(config.libraryPath);
   const existing = await loadMergedProjectManifest(projectDir);
+  const unmanaged = await discoverProjectUnmanagedSkills(
+    projectDir,
+    config.libraryPath,
+  );
 
+  const libraryByName = new Map(librarySkills.map((s) => [s.name, s]));
   const globalSet = new Set(index.global);
   const sharedSkills = existing.shared?.skills ?? {};
   const localSkills = existing.local?.skills ?? {};
   const raycastPinned = new Set(config.raycast.pinned);
 
-  console.log(pc.bold(`Library: ${pc.dim(config.libraryPath)}`));
-  if (librarySkills.length === 0) {
-    console.log(pc.dim("  (no skills in library)"));
+  if (options.project) {
+    const projectSkillNames = [
+      ...new Set([...Object.keys(sharedSkills), ...Object.keys(localSkills)]),
+    ].sort();
+
+    console.log(
+      pc.bold(`Project: ${path.basename(projectDir)} ${pc.dim(`(${projectDir})`)}`),
+    );
+
+    if (projectSkillNames.length === 0 && unmanaged.length === 0) {
+      console.log(pc.dim("  (no project-specific skills)"));
+    } else {
+      for (const name of projectSkillNames) {
+        const badges: string[] = [];
+        if (sharedSkills[name]) {
+          badges.push(pc.green(`repo:${sharedSkills[name].mode}`));
+        }
+        if (localSkills[name]) {
+          badges.push(pc.blue(`local:${localSkills[name].mode}`));
+        }
+        const installed = await pathExists(
+          path.join(getProjectAgentsSkillsDir(projectDir), name),
+        );
+        if (!installed) {
+          badges.push(pc.red("missing on disk"));
+        }
+        const meta = libraryByName.get(name);
+        if (!meta) {
+          badges.push(pc.red("missing in library"));
+        } else if (meta.issues.length > 0) {
+          badges.push(pc.red(`${meta.issues.length} issue(s)`));
+        }
+
+        const desc = meta?.description ? pc.dim(` — ${meta.description}`) : "";
+        console.log(`  • ${pc.bold(name)} [${badges.join(", ")}]${desc}`);
+      }
+
+      for (const item of unmanaged) {
+        const desc = item.info.description
+          ? pc.dim(` — ${item.info.description}`)
+          : "";
+        console.log(
+          `  • ${pc.bold(item.name)} [${pc.yellow(`unmanaged: ${item.relativeSource}`)}]${desc}`,
+        );
+      }
+    }
+
+    if (index.global.length > 0) {
+      console.log("");
+      console.log(pc.bold("Global skills (also active in this project):"));
+      for (const name of index.global) {
+        const meta = libraryByName.get(name);
+        const desc = meta?.description ? pc.dim(` — ${meta.description}`) : "";
+        console.log(`  • ${pc.bold(name)} [${pc.cyan("global")}]${desc}`);
+      }
+    }
     return;
   }
 
-  for (const skill of librarySkills) {
-    const badges: string[] = [];
-    if (globalSet.has(skill.name)) badges.push(pc.cyan("global"));
-    if (sharedSkills[skill.name]) {
-      badges.push(pc.green(`repo:${sharedSkills[skill.name].mode}`));
-    }
-    if (localSkills[skill.name]) {
-      badges.push(pc.blue(`local:${localSkills[skill.name].mode}`));
-    }
-    if (raycastPinned.has(skill.name)) badges.push(pc.magenta("raycast-pin"));
-    if (skill.issues.length > 0) {
-      badges.push(pc.red(`${skill.issues.length} issue(s)`));
-    }
+  console.log(pc.bold(`Library: ${pc.dim(config.libraryPath)}`));
+  if (librarySkills.length === 0) {
+    console.log(pc.dim("  (no skills in library)"));
+  } else {
+    for (const skill of librarySkills) {
+      const badges: string[] = [];
+      if (globalSet.has(skill.name)) badges.push(pc.cyan("global"));
+      if (sharedSkills[skill.name]) {
+        badges.push(pc.green(`repo:${sharedSkills[skill.name].mode}`));
+      }
+      if (localSkills[skill.name]) {
+        badges.push(pc.blue(`local:${localSkills[skill.name].mode}`));
+      }
+      if (raycastPinned.has(skill.name)) badges.push(pc.magenta("raycast-pin"));
+      if (skill.issues.length > 0) {
+        badges.push(pc.red(`${skill.issues.length} issue(s)`));
+      }
 
-    const badgeStr = badges.length > 0 ? ` [${badges.join(", ")}]` : "";
-    const desc = skill.description ? pc.dim(` — ${skill.description}`) : "";
-    console.log(`  • ${pc.bold(skill.name)}${badgeStr}${desc}`);
+      const badgeStr = badges.length > 0 ? ` [${badges.join(", ")}]` : "";
+      const desc = skill.description ? pc.dim(` — ${skill.description}`) : "";
+      console.log(`  • ${pc.bold(skill.name)}${badgeStr}${desc}`);
+    }
+  }
+
+  if (unmanaged.length > 0) {
+    console.log("");
+    console.log(pc.bold("Unmanaged skills in current project:"));
+    for (const item of unmanaged) {
+      const desc = item.info.description
+        ? pc.dim(` — ${item.info.description}`)
+        : "";
+      console.log(
+        `  • ${pc.bold(item.name)} [${pc.yellow(item.relativeSource)}]${desc}`,
+      );
+    }
   }
 }

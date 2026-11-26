@@ -104,12 +104,13 @@ Run `skillctl --help` or `skillctl <command> --help` for all flags.
 
 | Command | Description |
 |---|---|
-| `skillctl setup` | Configure library path, toggle Claude Code sync, and migrate existing skills |
+| `skillctl setup` | Configure library path, toggle Claude Code & Antigravity targets, and migrate existing skills |
+| `skillctl status` | Show library path, enabled targets, global/project skill counts, worktree state, and Raycast bridge |
 | `skillctl init` | Scan project, capture unknown local skills, suggest matches, and sync |
 | `skillctl add [skills...]` | Add skill(s) to current project (`--link` personal / `--copy` shared) |
 | `skillctl rm [skills...]` | Remove skill(s) from current project |
-| `skillctl sync` | Rebuild symlinks/copies from `.skillctl.json` and `.skillctl.local.json` |
-| `skillctl list` (`ls`) | List all library skills with `[global]`, `[repo:copy]`, `[local:link]`, `[raycast-pin]` badges |
+| `skillctl sync` | Rebuild symlinks/copies from `.skillctl.json` and `.skillctl.local.json` (auto-inherits local manifest in git worktrees) |
+| `skillctl list` (`ls`) | List all library skills (`-p, --project` to show only skills active in the current project) |
 | `skillctl global list\|add\|rm\|sync` | Manage global skills in `~/.agents/skills` (and `~/.claude/skills` if enabled) |
 | `skillctl raycast use\|clear\|add\|rm\|status` | Switch active project or pin skills in `~/.config/raycast/skills` (macOS) |
 | `skillctl install <source>` | Import skill(s) from GitHub (`owner/repo`, git URL) or a local folder into library |

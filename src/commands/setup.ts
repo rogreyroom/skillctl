@@ -16,6 +16,7 @@ import {
 export interface SetupOptions {
   library?: string;
   claude?: boolean;
+  antigravity?: boolean;
   yes?: boolean;
 }
 
@@ -67,10 +68,15 @@ export async function runSetupCommand(options: SetupOptions): Promise<void> {
       libraryPath,
       agents: {
         claude: options.claude ?? existing.agents.claude,
+        antigravity: options.antigravity ?? existing.agents.antigravity,
       },
     };
     await ensureLibraryScaffold(libraryPath);
     await saveConfig(config);
+    const index = await loadLibraryIndex(libraryPath);
+    if (index.global.length > 0) {
+      await syncGlobal(config, index);
+    }
     console.log(pc.green(`Configured skillctl library at ${libraryPath}`));
     return;
   }
@@ -105,6 +111,19 @@ export async function runSetupCommand(options: SetupOptions): Promise<void> {
     return;
   }
 
+  const antigravityAnswer =
+    options.antigravity !== undefined
+      ? options.antigravity
+      : await p.confirm({
+          message:
+            "Also sync global skills to Antigravity (~/.gemini/config/skills)?",
+          initialValue: existing.agents.antigravity,
+        });
+  if (p.isCancel(antigravityAnswer)) {
+    p.cancel("Setup cancelled.");
+    return;
+  }
+
   await ensureLibraryScaffold(libraryPath);
 
   const config = {
@@ -112,6 +131,7 @@ export async function runSetupCommand(options: SetupOptions): Promise<void> {
     libraryPath,
     agents: {
       claude: Boolean(claudeAnswer),
+      antigravity: Boolean(antigravityAnswer),
     },
   };
   await saveConfig(config);

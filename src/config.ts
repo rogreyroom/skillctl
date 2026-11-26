@@ -15,6 +15,7 @@ export function createDefaultConfig(): AppConfig {
     libraryPath: getDefaultLibraryPath(),
     agents: {
       claude: false,
+      antigravity: false,
     },
     raycast: {
       pinned: [],
@@ -43,6 +44,7 @@ export async function loadConfig(): Promise<AppConfig> {
         : defaults.libraryPath,
       agents: {
         claude: parsed.agents?.claude ?? defaults.agents.claude,
+        antigravity: parsed.agents?.antigravity ?? defaults.agents.antigravity,
       },
       raycast: {
         activeProject: parsed.raycast?.activeProject,
@@ -65,6 +67,7 @@ export async function saveConfig(config: AppConfig): Promise<void> {
     libraryPath: expandHome(config.libraryPath),
     agents: {
       claude: Boolean(config.agents.claude),
+      antigravity: Boolean(config.agents.antigravity),
     },
     raycast: {
       ...(config.raycast.activeProject

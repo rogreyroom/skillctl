@@ -28,9 +28,13 @@ export async function runGlobalListCommand(): Promise<void> {
   const config = await loadConfig();
   const index = await loadLibraryIndex(config.libraryPath);
 
+  const targets = ["~/.agents/skills"];
+  if (config.agents.claude) targets.push("~/.claude/skills");
+  if (config.agents.antigravity) targets.push("~/.gemini/config/skills");
+
   console.log(
     pc.bold(
-      `Global skills (${index.global.length})${config.agents.claude ? pc.dim(" [~/.agents/skills + ~/.claude/skills]") : pc.dim(" [~/.agents/skills]")}:`,
+      `Global skills (${index.global.length}) ${pc.dim(`[${targets.join(" + ")}]`)}:`,
     ),
   );
   if (index.global.length === 0) {

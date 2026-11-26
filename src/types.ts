@@ -4,6 +4,7 @@ export interface AppConfig {
   libraryPath: string;
   agents: {
     claude: boolean;
+    antigravity: boolean;
   };
   raycast: {
     activeProject?: string;

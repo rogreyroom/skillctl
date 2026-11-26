@@ -23,6 +23,7 @@ import {
   runRaycastUseCommand,
 } from "./commands/raycast.js";
 import { runSetupCommand } from "./commands/setup.js";
+import { runStatusCommand } from "./commands/status.js";
 
 const program = new Command();
 
@@ -39,8 +40,16 @@ program
   .option("--library <path>", "Central skill library path")
   .option("--claude", "Enable Claude Code (~/.claude/skills & .claude/skills)")
   .option("--no-claude", "Disable Claude Code sync")
+  .option("--antigravity", "Enable Antigravity global skills (~/.gemini/config/skills)")
+  .option("--no-antigravity", "Disable Antigravity global sync")
   .option("-y, --yes", "Run non-interactively with defaults")
   .action(runSetupCommand);
+
+program
+  .command("status")
+  .description("Show library path, enabled targets, global/project counts, and Raycast state")
+  .option("--dir <path>", "Target project directory")
+  .action(runStatusCommand);
 
 program
   .command("init")
@@ -77,7 +86,8 @@ program
 program
   .command("list")
   .alias("ls")
-  .description("List all library skills and their global/project/Raycast status")
+  .description("List library skills or only skills active in the current project (-p)")
+  .option("-p, --project", "Show only skills active in the current project (plus unmanaged & global)")
   .option("--dir <path>", "Target project directory")
   .action(runListCommand);
 
@@ -147,7 +157,7 @@ program
 
 program
   .command("migrate")
-  .description("Import existing skills from ~/.agents/skills and ~/.claude/skills into library")
+  .description("Import existing skills from ~/.agents, ~/.claude, ~/.cursor, and ~/.codegpt into library")
   .option("--overwrite", "Overwrite existing skills with the same name")
   .action(runMigrateCommand);
 
@@ -167,6 +177,7 @@ Examples:
   $ skillctl init                      Detect project stack & link/copy matching skills
   $ skillctl add vitest                Add personal skill (.skillctl.local.json, git-excluded)
   $ skillctl add vitest --copy         Add shared skill (.skillctl.json, committed to repo)
+  $ skillctl list --project            Verify all skills active in the current project
   $ skillctl raycast use               Expose current project's skills to Raycast
   $ skillctl doctor --fix              Find and auto-repair broken links, duplicates, or drift
 `,
